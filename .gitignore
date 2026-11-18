@@ -1,0 +1,21 @@
+# 构建产物
+mircoros_v2/build/
+mircoros_v2/install/
+mircoros_v2/log/
+
+# 依赖与环境
+mircoros_v2/python_env/
+mircoros_v2/third_party_library/
+mircoros_v2/cache/
+
+# 含密钥/密码的本地配置文件（不提交）
+mircoros_v2/.system_cfg/robot_info.json
+mircoros_v2/src/multi_brains/config/llm_agent_config.yaml
+mircoros_v2/src/microros_v2_bringup/config/multi_brains_pre_setting.yaml
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 截图临时目录
+.screenshots/

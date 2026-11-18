@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+import json
+import os
+import sys
+from typing import Annotated
+_venv_site=os.path.join(os.path.expanduser('~'), 'microros_ws', 'python_env','mircoros_v2_env','.venv', 'lib', 'python3.10', 'site-packages')
+if os.path.isdir(_venv_site):
+    sys.path.insert(0, _venv_site)
+else:
+    print(f"Warning: Virtual environment site-packages directory not found at {_venv_site}.")
+
+import cyclopts
+import mcp.types
+from rich.console import Console
+from fastmcp import Client
+
+# Modify this to change how the CLI connects to the MCP server.
+CLIENT_SPEC = 'http://localhost:8000/mcp'
+
+app = cyclopts.App(name="localhost", help="CLI for localhost MCP server")
+call_tool_app = cyclopts.App(name="call-tool", help="Call a tool on the server")
+app.command(call_tool_app)
+console = Console()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _print_tool_result(result):
+    if result.is_error:
+        for block in result.content:
+            if isinstance(block, mcp.types.TextContent):
+                console.print(f"[bold red]Error:[/bold red] {block.text}")
+            else:
+                console.print(f"[bold red]Error:[/bold red] {block}")
+        sys.exit(1)
+
+    if result.structured_content is not None:
+        console.print_json(json.dumps(result.structured_content))
+        return
+
+    for block in result.content:
+        if isinstance(block, mcp.types.TextContent):
+            console.print(block.text)
+        elif isinstance(block, mcp.types.ImageContent):
+            size = len(block.data) * 3 // 4
+            console.print(f"[dim][Image: {block.mimeType}, ~{size} bytes][/dim]")
+        elif isinstance(block, mcp.types.AudioContent):
+            size = len(block.data) * 3 // 4
+            console.print(f"[dim][Audio: {block.mimeType}, ~{size} bytes][/dim]")
+
+
+async def _call_tool(tool_name: str, arguments: dict) -> None:
+    # Filter out None values and empty lists (defaults for optional array params)
+    filtered = {
+        k: v
+        for k, v in arguments.items()
+        if v is not None and (not isinstance(v, list) or len(v) > 0)
+    }
+    async with Client(CLIENT_SPEC) as client:
+        result = await client.call_tool(tool_name, filtered, raise_on_error=False)
+        _print_tool_result(result)
+        if result.is_error:
+            sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# List / read commands
+# ---------------------------------------------------------------------------
+
+
+@app.command
+async def list_tools() -> None:
+    """List available tools."""
+    async with Client(CLIENT_SPEC) as client:
+        tools = await client.list_tools()
+        if not tools:
+            console.print("[dim]No tools found.[/dim]")
+            return
+        for tool in tools:
+            sig_parts = []
+            props = tool.inputSchema.get("properties", {})
+            required = set(tool.inputSchema.get("required", []))
+            for pname, pschema in props.items():
+                ptype = pschema.get("type", "string")
+                if pname in required:
+                    sig_parts.append(f"{pname}: {ptype}")
+                else:
+                    sig_parts.append(f"{pname}: {ptype} = ...")
+            sig = f"{tool.name}({', '.join(sig_parts)})"
+            console.print(f"  [cyan]{sig}[/cyan]")
+            if tool.description:
+                console.print(f"    {tool.description}")
+            console.print()
+
+# ---------------------------------------------------------------------------
+# Tool commands (generated from server schema)
+# ---------------------------------------------------------------------------
+@call_tool_app.command(name='AdjustCameraView')
+async def AdjustCameraView(
+    *,
+    pitch: Annotated[int, cyclopts.Parameter(help="Pitch adjustment in degrees. Positive=up, negative=down. Recommended step: 5-10 degrees")] = 0,
+    yaw: Annotated[int, cyclopts.Parameter(help="Yaw adjustment in degrees. Positive=right, negative=left. Recommended step: 5-10 degrees")] = 0,
+) -> None:
+    '''Adjust the camera perspective by pitch and yaw angles.Return the image after adjusting the camera perspective'''
+    await _call_tool('AdjustCameraView', {'pitch': pitch, 'yaw': yaw})
+
+
+@call_tool_app.command(name='SeeWhat')
+async def SeeWhat(
+) -> None:
+    '''Capture an image from the camera and return the image save path'''
+    await _call_tool('SeeWhat', {})
+
+
+@call_tool_app.command(name='RecordMapLocation')
+async def RecordMapLocation(
+    *,
+    name: Annotated[str, cyclopts.Parameter(help="Name of the location")],
+    symbol: Annotated[str, cyclopts.Parameter(help="Symbol of the location")],
+) -> None:
+    '''Save the current location to the map mapping file'''
+    await _call_tool('RecordMapLocation', {'name': name, 'symbol': symbol})
+
+
+@call_tool_app.command(name='GetMapMapping')
+async def GetMapMapping(
+) -> None:
+    '''Get the mapping relationship between all place names and their corresponding symbols'''
+    await _call_tool('GetMapMapping', {})
+
+
+@call_tool_app.command(name='Navigation')
+async def Navigation(
+    *,
+    location: Annotated[str, cyclopts.Parameter(help="The symbol corresponding to the location in the map mapping file")],
+) -> None:
+    '''Navigate to the target location via the target point symbol'''
+    await _call_tool('Navigation', {'location': location})
+
+@call_tool_app.command(name='Move')
+async def Move(
+    *,
+    direction: Annotated[str, cyclopts.Parameter(help="Movement direction: 'forward', 'backward', 'turn_left', or 'turn_right'")],
+    distance: Annotated[float, cyclopts.Parameter(help="Linear movement distance in meters. Only used when direction is 'forward' or 'backward'. Set to 0.0 for rotation.")] = 0.0,
+    angle: Annotated[float, cyclopts.Parameter(help="Rotation angle in degrees. Only used when direction is 'turn_left' or 'turn_right'. Set to 0.0 for linear movement.")] = 0.0,
+) -> None:
+    '''Move the robot chassis by a specified distance or rotate by a specified angle using odometry feedback.'''
+    await _call_tool('Move', {'direction': direction, 'distance': distance, 'angle': angle})
+
+@call_tool_app.command(name='GetBbox')
+async def GetBbox(
+    *,
+    query: Annotated[str, cyclopts.Parameter(help="Description of the target object's position and visual characteristics in the current view")],
+) -> None:
+    '''Detect and return the bounding box coordinates of a target object based on its description'''
+    await _call_tool('GetBbox', {'query': query})
+
+@call_tool_app.command(name='TargetTrack')
+async def TargetTrack(
+    *,
+    x1_or_cmd: Annotated[str, cyclopts.Parameter(help=" If input is a string cancel, it will stop the current tracking. If input is an integer, it will be treated as the x1 coordinate of the bounding box for target tracking")],
+    y1: Annotated[str | None, cyclopts.Parameter(help="")] = None,
+    x2: Annotated[str | None, cyclopts.Parameter(help="")] = None,
+    y2: Annotated[str | None, cyclopts.Parameter(help="")] = None,
+) -> None:
+    '''Visual tracking of target objects'''
+    # Parse JSON parameters, fallback to raw string if not valid JSON
+    def _parse(val):
+        if val is None:
+            return None
+        try:
+            return json.loads(val)
+        except json.JSONDecodeError:
+            return val
+    x1_or_cmd_parsed = _parse(x1_or_cmd)
+    y1_parsed = _parse(y1)
+    x2_parsed = _parse(x2)
+    y2_parsed = _parse(y2)
+    await _call_tool('TargetTrack', {'x1_or_cmd': x1_or_cmd_parsed, 'y1': y1_parsed, 'x2': x2_parsed, 'y2': y2_parsed})
+
+@call_tool_app.command(name='CameraActionGroup')
+async def CameraActionGroup(
+    *,
+    action_name: Annotated[str, cyclopts.Parameter(help='Name of the fixed camera action group: "init_camera_pose", "nod" or "shake"')],
+) -> None:
+    '''Execute a fixed camera(PTZ) action group by name: init_camera_pose / nod / shake'''
+    await _call_tool('CameraActionGroup', {'action_name': action_name})
+
+@call_tool_app.command(name='FollowLine')
+async def FollowLine(
+    *,
+    color: Annotated[str, cyclopts.Parameter(help="Color of the line to follow: 'red', 'green', 'blue', or 'yellow'")],
+) -> None:
+    '''Follow a colored line via the camera feed until the line disappears'''
+    await _call_tool('FollowLine', {'color': color})
+
+if __name__ == "__main__":
+    app()

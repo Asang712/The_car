@@ -1,0 +1,33 @@
+A:
+  name: 茶水间
+  position:
+    x: 6.081
+    y: 0.379
+    z: 0.0
+  orientation:
+    x: 0.0
+    y: 0.0
+    z: 0.034
+    w: 0.999
+B:
+  name: 办公室
+  position:
+    x: 3.941
+    y: 1.683
+    z: 0.0
+  orientation:
+    x: 0.0
+    y: 0.0
+    z: 0.693
+    w: 0.721
+C:
+  name: 搬运车间
+  position:
+    x: 5.52
+    y: 0.401
+    z: 0.0
+  orientation:
+    x: 0.0
+    y: 0.0
+    z: -0.035
+    w: 0.999

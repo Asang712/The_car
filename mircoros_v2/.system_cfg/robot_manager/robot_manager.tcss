@@ -1,0 +1,111 @@
+/* robot_manager Textual stylesheet */
+
+Screen {
+    background: $surface;
+}
+
+TabbedContent {
+    height: 1fr;
+}
+
+/* Each panel scrolls independently and has comfortable padding. */
+InfoPanel, HostPanel, BoardPanel {
+    padding: 1 2;
+    height: 1fr;
+}
+
+.section-title {
+    text-style: bold;
+    color: $text;
+    background: $primary 20%;
+    border: round $primary;
+    padding: 0 1;
+    margin-bottom: 1;
+    width: 100%;
+}
+
+.group-title {
+    text-style: bold;
+    color: $accent;
+    margin-top: 1;
+    margin-bottom: 0;
+}
+
+/* Info panel bodies */
+.info-body {
+    border: round $primary 60%;
+    padding: 1 2;
+    margin-bottom: 1;
+    width: 100%;
+}
+
+/* Language selector on the info panel */
+#info-lang {
+    width: 30;
+}
+
+.info-status {
+    border: round $secondary 60%;
+    padding: 1 2;
+    width: 100%;
+}
+
+/* Labeled input rows */
+.field-row {
+    height: auto;
+    margin-bottom: 1;
+    align-vertical: middle;
+}
+
+.field-label {
+    width: 20;
+    padding: 1 1 0 0;
+    text-align: right;
+    color: $text-muted;
+}
+
+.field-input {
+    width: 1fr;
+}
+
+.pid-input {
+    width: 1fr;
+    margin-right: 1;
+}
+
+/* Button rows */
+.button-row {
+    height: auto;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+.button-row Button {
+    margin-right: 2;
+}
+
+/* Status lines: neutral by default, green on success, red on error. */
+.status-line {
+    padding: 0 1;
+    margin-top: 1;
+    width: 100%;
+    color: $text-muted;
+}
+
+.status-ok {
+    color: $success;
+    text-style: bold;
+}
+
+.status-error {
+    color: $error;
+    text-style: bold;
+}
+
+/* Board serial log */
+.board-log {
+    height: 12;
+    border: round $secondary 60%;
+    padding: 0 1;
+    background: $panel;
+}

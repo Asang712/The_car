@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Robot-manager
+Exec=gnome-terminal --title="Robot Manager" -- bash -ic "python3 /home/yahboom/microros_ws/.system_cfg/robot_manager/robot_manager.py; exec bash"
+Icon=/home/yahboom/microros_ws/.system_cfg/icon/robot_manager.png
+Terminal=false
+Type=Application
+Categories=Utility;Robot;

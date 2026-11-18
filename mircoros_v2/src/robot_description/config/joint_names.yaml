@@ -1,0 +1,6 @@
+controller_joint_names:
+  - lfwheel
+  - rfwheel
+  - bwheel
+  - cam1
+  - cam2

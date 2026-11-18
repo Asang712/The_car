@@ -1,0 +1,7 @@
+<library path="route_tool">
+  <class name="route_tool"
+         type="roadnet::RouteTool"
+         base_class_type="rviz_common::Panel">
+    <description>A panel for creating and editing route graphs for roadnet</description>
+  </class>
+</library>

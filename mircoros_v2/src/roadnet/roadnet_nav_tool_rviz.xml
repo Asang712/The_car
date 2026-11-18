@@ -1,0 +1,7 @@
+<library path="roadnet_nav_tool">
+  <class name="roadnet_nav"
+         type="roadnet::RoadnetNavTool"
+         base_class_type="rviz_common::Panel">
+    <description>A panel for roadnet navigation with waypoint and pose modes</description>
+  </class>
+</library>

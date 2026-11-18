@@ -1,0 +1,11 @@
+build/
+install/
+log/
+python_env/
+*.sh
+*.deb
+/src/smart_tracker/
+third_party_library/
+src/microros_v2_bringup/docs/
+cache/
+__pycache__/

@@ -1,0 +1,54 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Package",
+            "type": "shell",
+            "command": "cd /home/yahboom/microros_ws && source /opt/ros/humble/setup.bash && colcon build --packages-select ${input:packageName}",
+            "group": "build",
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "Build Package (symlink)",
+            "type": "shell",
+            "command": "cd /home/yahboom/microros_ws && source /opt/ros/humble/setup.bash && colcon build --packages-select ${input:packageNameSymlink} --symlink-install",
+            "group": "build",
+            "problemMatcher": ["$gcc"]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "packageName",
+            "description": "Please select the packages to be compiled",
+            "type": "pickString",
+            "options": [
+                "roadnet",
+                "interfaces",
+                "multi_brains_pre",
+                "common_demo",
+                "microros_v2_multi_nav_pkg",
+                "ros_robot_app",
+                "microros_v2_kcf_follow_pkg",
+                "microros_v2_mediapipe_pkg",
+                "microros_v2_no_ptz_visual_control_pkg",
+                "microros_v2_opencv_visual_pkg",
+                "microros_v2_ptz_visual_control_pkg",
+                "microros_v2_yolo_pkg",
+                "multi_brains",
+                "yolo_onnx_follow_pkg"
+            ],
+            "default": "roadnet"
+        },
+        {
+            "id": "packageNameSymlink",
+            "description": "Please select the packages to be compiled (symlink)",
+            "type": "pickString",
+            "options": [
+                "microros_v2_bringup",
+                "robot_description"
+            ],
+            "default": "microros_v2_bringup"
+        }
+    ]
+}
+

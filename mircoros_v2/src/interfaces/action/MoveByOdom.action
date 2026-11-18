@@ -1,0 +1,12 @@
+# Goal: target movement parameters
+float32 distance        # Target distance in meters (for linear movements)
+string  direction       # Movement direction: forward/backward/turn_left/turn_right
+float32 angle           # Target angle in degrees (for rotational movements only)
+---
+# Result
+bool    success         # Whether the movement completed successfully
+string  message         # Result message
+---
+# Feedback
+float32 moved_distance  # Distance moved so far (meters), for linear movements
+float32 rotated_angle   # Angle rotated so far (degrees), for rotational movements

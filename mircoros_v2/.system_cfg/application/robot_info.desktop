@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Robot-info
+Exec=gnome-terminal --title="Robot Info" -- bash -ic "python3 -c \"import sys; sys.path.insert(0, '/home/yahboom/microros_ws/src/microros_v2_bringup'); from microros_v2_bringup.robot_tools.robot_tool import PrintRobotInfo; PrintRobotInfo()\"; exec bash"
+Icon=/home/yahboom/microros_ws/.system_cfg/icon/board.png
+Terminal=false
+Type=Application
+Categories=Utility;Robot;

@@ -1,0 +1,4 @@
+microros_v2_patrol_node:
+  ros__parameters:
+    enable_odom_calibration: true
+    scale_odom_covariance: true

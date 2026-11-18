@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="camera">
+
+  <!-- namespace: distinguish different robots, default empty -->
+  <xacro:macro name="camera" params="camera_type:=ptz parent_link:=base_link namespace:=''">
+
+    <xacro:property name="prefix" value="${namespace + '/' if namespace != '' else ''}"/>
+
+    <!-- ============================ ptz ============================ -->
+    <xacro:if value="${camera_type == 'ptz'}">
+      <!-- cam1_Link -->
+      <link name="${prefix}cam1_Link">
+        <inertial>
+          <origin xyz="0.0121389073204854 0.000669301634392163 0.0183647352931962" rpy="0 0 0"/>
+          <mass value="0.0150190743220174"/>
+          <inertia
+            ixx="1.67684922048039E-06" ixy="-1.4495206578422E-09" ixz="-2.68839730204742E-07"
+            iyy="9.82674908479193E-07"  iyz="8.72821102726354E-09"
+            izz="1.41806659489554E-06"/>
+        </inertial>
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://robot_description/meshes/cam1_Link.STL"/>
+          </geometry>
+          <material name="">
+            <color rgba="0.776470588235294 0.756862745098039 0.737254901960784 1"/>
+          </material>
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://robot_description/meshes/cam1_Link.STL"/>
+          </geometry>
+        </collision>
+      </link>
+
+      <joint name="${prefix}cam1" type="revolute">
+        <origin xyz="0.03565 0 0.06015" rpy="0 0 0"/>
+        <parent link="${prefix}${parent_link}"/>
+        <child link="${prefix}cam1_Link"/>
+        <axis xyz="0 0 -1"/>
+        <limit lower="-1.57" upper="1.57" effort="10" velocity="1000"/>
+      </joint>
+
+      <!-- cam2_Link -->
+      <link name="${prefix}cam2_Link">
+        <inertial>
+          <origin xyz="0.00121786453637515 -0.00236723452003631 0.0156026061538472" rpy="0 0 0"/>
+          <mass value="0.0111321636619767"/>
+          <inertia
+            ixx="5.664898482578E-06" ixy="-2.931003209155E-09" ixz="6.93764397766418E-07"
+            iyy="3.40834727142641E-06" iyz="-1.08779959378535E-08"
+            izz="5.09286583802649E-06"/>
+        </inertial>
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://robot_description/meshes/cam2_Link.STL"/>
+          </geometry>
+          <material name="">
+            <color rgba="0.223529411764706 0.223529411764706 0.223529411764706 1"/>
+          </material>
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://robot_description/meshes/cam2_Link.STL"/>
+          </geometry>
+        </collision>
+      </link>
+
+      <joint name="${prefix}cam2" type="revolute">
+        <origin xyz="0.016873 0.0011016 0.025104" rpy="0 -0.785 0"/>
+        <parent link="${prefix}cam1_Link"/>
+        <child link="${prefix}cam2_Link"/>
+        <axis xyz="0 -1 0"/>
+        <limit lower="-1.57" upper="0.349" effort="10" velocity="1000"/>
+      </joint>
+
+      <!-- cam3_Link -->
+      <link name="${prefix}cam3_Link">
+        <inertial>
+          <origin xyz="-0.0135208456322652 5.89211080087419E-06 -0.0142528896287866" rpy="0 0 0"/>
+          <mass value="0.00775795599642796"/>
+          <inertia
+            ixx="7.1546126704276E-07" ixy="-1.1516336338448E-10" ixz="9.23711125407915E-11"
+            iyy="4.96761626704043E-07" iyz="-1.84321954449318E-09"
+            izz="2.49121883931344E-07"/>
+        </inertial>
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://robot_description/meshes/cam3_Link.STL"/>
+          </geometry>
+          <material name="">
+            <color rgba="0.776470588235294 0.756862745098039 0.737254901960784 1"/>
+          </material>
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://robot_description/meshes/cam3_Link.STL"/>
+          </geometry>
+        </collision>
+      </link>
+
+      <joint name="${prefix}cam3" type="fixed">
+        <origin xyz="0.039499 -0.0005655 0.014475" rpy="0 0 0"/>
+        <parent link="${prefix}cam2_Link"/>
+        <child link="${prefix}cam3_Link"/>
+      </joint>
+
+      <link name="${prefix}camera"/>
+      <joint name="${prefix}camera_optical_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
+        <parent link="${prefix}cam3_Link"/>
+        <child link="${prefix}camera"/>
+      </joint>
+      
+    </xacro:if>
+
+    <!-- ============================ no_ptz ============================ -->
+    <xacro:if value="${camera_type == 'no_ptz'}">
+        <link
+            name="${prefix}cam01_Link">
+            <inertial>
+            <origin
+                xyz="0.0118540159792332 -2.6417903822569E-17 -0.000323599686711792"
+                rpy="0 0 0" />
+            <mass
+                value="0.00780050210574768" />
+            <inertia
+                ixx="2.03324241099069E-06"
+                ixy="-2.69403817643113E-21"
+                ixz="3.11382790484611E-09"
+                iyy="7.52033749161857E-07"
+                iyz="-6.87232290928168E-21"
+                izz="1.79396882607069E-06" />
+            </inertial>
+            <visual>
+            <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+            <geometry>
+                <mesh
+                filename="package://robot_description/meshes/cam01_Link.STL" />
+            </geometry>
+            <material
+                name="">
+                <color
+                rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+            </material>
+            </visual>
+            <collision>
+            <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+            <geometry>
+                <mesh
+                filename="package://robot_description/meshes/cam01_Link.STL" />
+            </geometry>
+            </collision>
+        </link>
+        <joint
+            name="${prefix}cam01"
+            type="revolute">
+            <origin
+            xyz="0.0525 0 0.085"
+            rpy="0 0 0" />
+            <parent
+            link="${prefix}${parent_link}" />
+            <child
+            link="${prefix}cam01_Link" />
+            <axis
+            xyz="0 1 0" />
+            <limit
+            lower="-0.785"
+            upper="0.785"
+            effort="10"
+            velocity="1000" />
+        </joint>
+        <link
+            name="${prefix}cam02_Link">
+            <inertial>
+            <origin
+                xyz="-0.0145395853610796 -1.78427913797033E-05 -0.0137844705090851"
+                rpy="0 0 0" />
+            <mass
+                value="0.00850087768720135" />
+            <inertia
+                ixx="1.0885895706635E-06"
+                ixy="-1.15163465928105E-10"
+                ixz="9.23709895907161E-11"
+                iyy="7.65289991135727E-07"
+                iyz="-1.8429707683583E-09"
+                izz="3.44855838038448E-07" />
+            </inertial>
+            <visual>
+            <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+            <geometry>
+                <mesh
+                filename="package://robot_description/meshes/cam02_Link.STL" />
+            </geometry>
+            <material
+                name="">
+                <color
+                rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+            </material>
+            </visual>
+            <collision>
+            <origin
+                xyz="0 0 0"
+                rpy="0 0 0" />
+            <geometry>
+                <mesh
+                filename="package://robot_description/meshes/cam02_Link.STL" />
+            </geometry>
+            </collision>
+        </link>
+        <joint
+            name="${prefix}cam02"
+            type="fixed">
+            <origin
+            xyz="0.039501 -1.5516E-05 0.015"
+            rpy="0 0 0" />
+            <parent
+            link="${prefix}cam01_Link" />
+            <child
+            link="${prefix}cam02_Link" />
+            <axis
+            xyz="0 0 0" />
+        </joint>
+
+        <link name="${prefix}camera"/>
+        <joint name="${prefix}camera_optical_joint" type="fixed">
+          <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
+          <parent link="${prefix}cam02_Link"/>
+          <child link="${prefix}camera"/>
+        </joint>
+    </xacro:if>
+
+    <!-- basic_car: no camera -->
+
+  </xacro:macro>
+</robot>

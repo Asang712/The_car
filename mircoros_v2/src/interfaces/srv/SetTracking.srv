@@ -1,0 +1,6 @@
+# Request
+bool enable      # true: 开始跟随目标, false: 停止跟随
+---
+# Response
+bool success
+string message

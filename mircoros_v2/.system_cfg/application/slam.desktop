@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Mapping
+Exec=/home/yahboom/microros_ws/src/scripts/mapping.sh
+Icon=/home/yahboom/microros_ws/.system_cfg/icon/mapping.png
+Terminal=false
+Type=Application
+Categories=Utility;Robot;

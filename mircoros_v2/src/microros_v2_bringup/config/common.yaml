@@ -1,0 +1,112 @@
+base_driver:
+  ros__parameters:
+    odom_linear_speed: 0.15        # 最大线速度 (m/s)
+    odom_angular_speed: 0.5        # 最大角速度 (rad/s)
+    odom_position_tolerance: 0.02   # 线性移动位置容差 (m)
+    odom_angle_tolerance: 0.05       # 旋转角度容差 (rad)
+    odom_timeout: 30.0              # 动作超时 (s)
+    min_linear_speed: 0.03          # 统一最小线速度 (m/s)，防止 move_by_odom/precise_adjust 假死
+    min_angular_speed: 0.2          # 统一最小角速度 (rad/s)：必须大于底盘转向静摩擦死区，否则命令太小时轮子不转
+    precise_adjust_xy_pid: [0.5, 0.0, 0.05]       # DRIVE阶段: Kp=距离->前进速度增益 [Kp, Ki, Kd]
+    precise_adjust_theta_pid: [1.0, 0.0, 0.3]     # 各转向阶段: Kp=朝向误差->角速度增益 [Kp, Ki, Kd]
+    precise_adjust_max_linear_vel: 0.12           # 精确调整最大线速度 (m/s)，放慢以提升收敛稳定性
+    precise_adjust_max_angular_vel: 0.5           # 精确调整最大角速度 (rad/s)，保证转向果断
+    precise_adjust_pos_tolerance: 0.01            # 精确调整位置容差 (m)，放宽以适应TF/里程计噪声
+    precise_adjust_angle_tolerance: 0.06          # 精确调整角度容差 (rad, ~3.4°)
+    precise_adjust_max_iteration: 500             # 精确调整最大迭代次数 (10Hz → 约50s)
+
+
+super_tracker:
+  ros__parameters:
+    num_threads : 4
+    confience :  0.1
+
+laser_Avoidance:
+  ros__parameters:
+    linear: 0.15                    # 前进线速度 (m/s)
+    angular: 1.0                 # 原地转向角速度 (rad/s)
+    LaserAngle: 30.0                # 前方障碍检测扇区半角 (度)
+    ResponseDist: 0.3               # 避障响应距离 (m), 实际判定阈值为该值的1.5倍
+
+laser_Tracker:
+  ros__parameters:
+    linear: 0.15                    # 最大前进线速度 (m/s)
+    angular: 1.0                    # 最大转向角速度 (rad/s)
+    LaserAngle: 45.0                # 目标搜索扇区半角 (度)
+    ResponseDist: 0.4               # 跟随保持距离 (m)
+    enable: false                   # 启动时是否启用跟随
+
+    # ---- PID ----
+    lin_pid_P: 1.0                  # 线速度 PID: 比例
+    lin_pid_I: 0.0                  # 线速度 PID: 积分
+    lin_pid_D: 1.0                  # 线速度 PID: 微分
+    ang_pid_P: 2.0                  # 角速度 PID: 比例
+    ang_pid_I: 0.0                  # 角速度 PID: 积分
+    ang_pid_D: 2.0                  # 角速度 PID: 微分
+
+    # ---- 角速度死区与限幅 ----
+    angular_deadzone: 0.02          # 角速度死区 (rad/s), 小于此值轮子不转
+    max_angular: 2.0                # 角速度上限 (rad/s)
+
+laser_Warning:
+  ros__parameters:
+    linear: 0.15                    # 线速度 (m/s), 警卫模式下保留参数
+    angular: 1.0                    # 转向角速度 (rad/s)
+    LaserAngle: 45.0                # 前方警戒扇区半角 (度)
+    ResponseDist: 0.55              # 蜂鸣器报警距离 (m)
+
+    # ---- 角速度 PID (转向对准障碍物) ----
+    ang_pid_P: 3.0                  # 角速度 PID: 比例
+    ang_pid_I: 0.0                  # 角速度 PID: 积分
+    ang_pid_D: 5.0                  # 角速度 PID: 微分
+
+    # ---- 角速度死区与限幅 ----
+    max_angular: 2.0                # 角速度上限 (rad/s)
+
+visual_track:
+  ros__parameters:
+    # ---- 目标居中 / 帧有效性 ----
+    pixel_tolerance: 15             # 目标居中的像素容差 (中心田字格半边长)
+    max_step_xy: 5.0                # 云台单周期最大步进角 (度)
+    min_confidence: 0.01            # 目标最低置信度, 低于则视为丢失
+    bbox_max_age: 0.4               # bbox 最大有效时延 (s), 超时视为丢失
+
+    # ---- 云台 PID (作用于归一化误差 [-1, 1]) ----
+    kp_x: 0.6
+    kd_x: 0.15
+    kp_y: 0.6
+    kd_y: 0.15
+
+    # ---- ptz 模式: 底盘随动 (车头正对目标) ----
+    enable_body_follow: true        # 是否启用底盘随动转向
+    body_kp: 0.03                   # 底盘随动比例增益 (作用于 servo1 角度)
+    body_kd: 0.0                    # 底盘随动微分增益
+    body_tolerance_deg: 3.0         # 底盘停转阈值 (度)
+    servo1_engage_deg: 5.0          # 底盘起转阈值 (度)
+    max_angular_z: 0.6              # 最大角速度 (rad/s)
+    reverse_body_direction: false   # 底盘转向翻转 (默认: 目标偏右则右转)
+    body_ff_gain: 1.0               # 舵机对车身旋转的前馈补偿增益 (VOR): 1.0 全补偿, 0 关闭
+
+    # ---- no_ptz 模式 (无云台): 底盘按水平像素误差旋转对准 ----
+    no_ptz_yaw_kp: 0.9              # 底盘旋转比例增益 (作用于归一化像素误差)
+    no_ptz_yaw_kd: 0.1             # 底盘旋转微分增益
+    no_ptz_engage_px: 30.0          # 底盘起转的像素误差阈值
+    no_ptz_align_px: 80.0           # 视为已对准(可前后移动)的像素误差阈值
+
+    # ---- 距离保持 (前后移动, bbox 外接圆面积测距, ptz / no_ptz 通用) ----
+    enable_distance_keeping: true   # 是否启用距离保持
+    distance_min_confidence: 0.6    # 前后移动的最低置信度, 低于此值只转向不前后移动
+    max_linear_x: 0.18              # 最大线速度 (m/s)
+    distance_align_deg: 40.0        # ptz 模式: |servo1| 小于此值才前后移动 (度)
+    reverse_linear: false           # 线速度方向翻转 (不同机型 +x 方向可能相反)
+
+    # ---- bbox 面积测距 (近大远小) ----
+    bbox_ref_frames: 3              # 基准采样帧数 (捕获目标的前 N 帧取中位数)
+    bbox_area_smooth: 0.4           # 当前面积 EMA 平滑系数 (0~1, 越大越灵敏)
+    bbox_ratio_tolerance: 0.08      # 相对距离死区 (|ratio-1| 小于该值不动)
+    bbox_dist_kp: 0.5               # 距离保持比例增益
+    bbox_dist_kd: 0.0               # 距离保持微分增益
+    bbox_ratio_max: 3.0             # 相对距离比值限幅
+
+
+    

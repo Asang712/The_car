@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Navigation
+Exec=/home/yahboom/microros_ws/src/scripts/navigation.sh
+Icon=/home/yahboom/microros_ws/.system_cfg/icon/navigation.png
+Terminal=false
+Type=Application
+Categories=Utility;Robot;

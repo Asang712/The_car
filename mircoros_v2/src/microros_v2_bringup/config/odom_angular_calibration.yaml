@@ -1,0 +1,4 @@
+microros_v2_patrol_node:
+  ros__parameters:
+    odom_angular_left_scale_correction: 1.0707901321094468
+    odom_angular_right_scale_correction: 1.0863425925925925

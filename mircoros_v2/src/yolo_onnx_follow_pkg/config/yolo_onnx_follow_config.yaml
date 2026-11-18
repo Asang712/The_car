@@ -1,0 +1,151 @@
+SYSTEM:
+  # 底盘速度话题；本案例只发布 angular.z，linear.x 始终为 0。
+  cmd_vel_topic: "/cmd_vel"
+
+PTZ:
+  # 云台角度话题，Vector3.x 为水平舵机，Vector3.y 为俯仰舵机。
+  angle_topic: "/cmd_ptz_angle"
+
+  # 云台限位，防止控制量超过机械安全范围。
+  servo1_min_angle: -90.0
+  servo1_max_angle: 90.0
+  servo2_min_angle: -90.0
+  servo2_max_angle: 20.0
+
+  # 启动和停止归中的云台角度。
+  servo1_initial_angle: 0.0
+  servo2_initial_angle: -45.0
+
+  # 单次云台命令重复发布次数和间隔。
+  publish_count: 1
+  publish_interval_sec: 0.05
+
+  # 启动时重复发布初始角度，确保下位机收到归中命令。
+  initialize_on_startup: true
+  startup_publish_count: 10
+  startup_publish_interval_sec: 0.1
+
+  # 退出/清除时是否让云台回到初始角度。
+  recenter_after_stop: true
+  settle_time_sec: 0.3
+
+YOLO_ONNX_FOLLOW:
+  # YOLOv11 ONNX 模型路径。
+  model_path: "/home/yahboom/MODELS/yolo/yolo11n.onnx"
+
+  # 自定义类别名文件；为空时使用 COCO 80 类。
+  class_names_path: ""
+
+  # 相机图像话题，类型必须是 sensor_msgs/msg/Image。
+  image_topic: "/camera/image_raw"
+
+  # ONNX 输入尺寸，需要和导出模型的输入一致；常见 YOLO 为 640x640。
+  input_width: 640
+  input_height: 640
+
+  # 检测置信度和 NMS 阈值。识别太少可降低 conf_threshold，误检多就升高。
+  conf_threshold: 0.2
+  nms_threshold: 0.45
+
+  # 每帧最多保留置信度最高的检测框数量，减少画面杂项目标干扰。
+  max_detections: 3
+
+  # YOLO 输出是否带 objectness；YOLOv8/v11 常用 auto 即可。
+  has_objectness: "auto"
+
+  # OpenCV DNN 是否使用 CUDA；没有 CUDA 版 OpenCV 时保持 false。
+  use_cuda: false
+
+  # 默认只打印目标选择/重捕获/丢失日志。排障时改 true，会打印图像和控制诊断。
+  diagnostic_log_enable: false
+
+  # OpenCV 显示窗口参数。
+  show_window: true
+  display_rate_hz: 20.0
+  window_width: 640
+  window_height: 480
+  window_name: "YOLOv11 ONNX Follow"
+
+  # 目标选择：默认留空/-1，先看窗口，再鼠标点击目标框。
+  # target_class 按类别名自动跟踪，例如 "person"。
+  # target_class_id 按类别编号自动跟踪，例如 0。
+  # target_id 按窗口中显示的局部跟踪 id 跟踪。
+  target_class: ""
+  target_class_id: -1
+  target_id: -1
+
+  # 简易 IoU 跟踪器参数。IoU 阈值越低 id 越不容易变，但同类靠近时更易错配。
+  track_iou_threshold: 0.2
+
+  # IoU 匹配失败时，允许用同类别目标中心距离兜底匹配，降低 id 跳变。
+  track_center_threshold_ratio: 0.12
+  track_max_lost_frames: 30
+
+  # 点击目标后的重捕获开关；目标 id 变化时，按同类别和上一帧位置找回。
+  reacquire_enable: true
+
+  # 重捕获时允许的最小框重叠比例；0.05 表示有轻微重叠即可接受。
+  reacquire_iou_threshold: 0.05
+
+  # 重捕获时允许中心点偏移的图像对角线比例。
+  # 0.25 更保守，0.35 折中，0.45 更适合快速移动目标。
+  reacquire_max_center_ratio: 0.45
+
+  # 目标丢失后最多等待多少个检测帧继续尝试找回。
+  reacquire_max_lost_frames: 30
+
+  # 重捕获评分中置信度的权重；越大越偏向高置信度框。
+  reacquire_score_weight: 0.15
+
+  # 目标中心平滑系数；越小越平滑但延迟更大，1.0 表示不平滑。
+  target_center_smoothing_alpha: 0.65
+
+  # 最大推理频率和控制频率；性能不够时优先降低 max_inference_rate_hz。
+  max_inference_rate_hz: 15.0
+  follow_rate_hz: 10.0
+
+  # 超过该时间没有有效目标，就停止底盘 yaw 并重置控制器。
+  target_stale_timeout_sec: 0.6
+
+  # 目标距离画面中心小于该像素误差时，不再修正云台。
+  pixel_tolerance: 15.0
+
+  # 云台水平/俯仰 PID 参数；这里只用 P+D，增大 kp 反应更快，增大 kd 抑制抖动。
+  kp_x: 0.6
+  kd_x: 0.15
+  kp_y: 0.6
+  kd_y: 0.15
+
+  # 每个控制周期云台最大角度步进，越大跟得越快但更容易抖。
+  max_step_xy: 5.0
+
+  # 云台方向修正；目标往反方向跑时改对应符号。
+  sign_x: 1.0
+  sign_y: -1.0
+
+  # 是否启用底盘水平转向，让底盘跟随云台水平偏角回正。
+  enable_body_turn_follow: true
+
+  # 底盘 yaw 控制参数。body_kp 越大底盘转得越快，body_kd 一般保持 0。
+  body_kp: 0.03
+  body_kd: 0.0
+
+  # 云台水平偏角超过 servo1_engage_deg 才启动底盘转向；
+  # 回到 body_tolerance_deg 内停止，形成滞回，减少左右抖动。
+  body_tolerance_deg: 3.0
+  servo1_engage_deg: 5.0
+
+  # 底盘最大角速度和方向；底盘转反时改 body_dir 符号。
+  max_angular_z: 0.6
+  body_dir: -1.0
+
+  # 底盘转动时给云台做前馈补偿，减少车身转动造成的画面偏移。
+  body_ff_gain: 1.0
+
+  # CAR_TYPE=no_ptz 时，直接按目标水平位置控制固定摄像头车型的底盘转向。
+  # 误差会按半幅图像宽度归一化到 [-1, 1]，再由以下 P/D 增益换算为角速度。
+  fixed_camera_body_kp: 0.4
+  fixed_camera_body_kd: 0.0
+  # 固定摄像头车型的独立最大角速度，不影响 CAR_TYPE=ptz。
+  fixed_camera_max_angular_z: 0.3
+

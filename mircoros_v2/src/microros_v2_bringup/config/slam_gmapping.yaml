@@ -1,0 +1,144 @@
+/slam_gmapping:
+  ros__parameters:
+    angularUpdate: 0.25
+    astep: 0.05
+    base_frame: base_footprint      
+    map_frame: map
+    odom_frame: odom
+    delta: 0.05
+    iterations: 5
+    kernelSize: 1
+    
+    lasamplerange: 0.005
+    lasamplestep: 0.005
+    linearUpdate: 0.5
+    llsamplerange: 0.01
+    llsamplestep: 0.01
+    
+    lsigma: 0.075
+    lskip: 0
+    lstep: 0.05
+    map_update_interval: 3.0
+    maxRange: 6.0
+    maxUrange: 4.0
+    minimum_score: 0.0
+    occ_thresh: 0.25
+    ogain: 3.0
+    particles: 30
+    qos_overrides: #QOS配置
+      /parameter_events:
+        publisher:
+          depth: 1000
+          durability: volatile
+          history: keep_all
+          reliability: reliable
+      /tf:
+        publisher:
+          depth: 1000
+          durability: volatile
+          history: keep_last
+          reliability: reliable
+    resampleThreshold: 0.5
+    sigma: 0.05
+    srr: 0.1
+    srt: 0.2
+    str: 0.1
+    stt: 0.2
+    temporalUpdate: 1.0
+    transform_publish_period: 0.05
+    use_sim_time: false
+    xmax: 100.0
+    xmin: -100.0
+    ymax: 100.0
+    ymin: -100.0
+
+/slam_gmapping:
+  ros__parameters:
+    # 机器人旋转角度超过该阈值时触发地图更新（单位：弧度），0.25弧度约14.3度
+    angularUpdate: 0.25
+    # 扫描匹配中角度搜索步长（单位：弧度），步长越小匹配越精细
+    astep: 0.05
+    # 机器人基坐标系名称，需与TF树中实际基坐标系一致
+    base_frame: base_footprint      
+    # 地图坐标系名称，构建的地图以该坐标系为基准
+    map_frame: map
+    # 里程计坐标系名称，用于机器人运动的短期定位参考
+    odom_frame: odom
+    # 地图分辨率（单位：米/像素），0.05表示1像素对应5厘米
+    delta: 0.05
+    # 扫描匹配的迭代次数，次数越多匹配结果越精确但计算量越大
+    iterations: 5
+    # 扫描匹配中核函数大小，用于融合周围栅格信息，值越大抗噪声越强但精度可能下降
+    kernelSize: 1
+    
+    # 似然采样的角度范围（单位：弧度），控制粒子在角度方向的采样范围
+    lasamplerange: 0.005
+    # 似然采样的角度步长（单位：弧度），步长越小角度采样越精细
+    lasamplestep: 0.005
+    # 机器人线性移动距离超过该阈值时触发地图更新（单位：米）
+    linearUpdate: 0.5
+    # 似然采样的线性范围（单位：米），控制粒子在线性方向的采样范围
+    llsamplerange: 0.01
+    # 似然采样的线性步长（单位：米），步长越小线性采样越精细
+    llsamplestep: 0.01
+    
+    # 激光束似然计算的标准差（单位：米），值越大对激光点与地图偏差的容忍度越高
+    lsigma: 0.075
+    # 计算似然时跳过的激光束数量，0表示使用所有激光束
+    lskip: 0
+    # 扫描匹配中线性搜索步长（单位：米），步长越小匹配越精细
+    lstep: 0.05
+    # 地图发布的最小时间间隔（单位：秒），控制地图数据发布频率
+    map_update_interval: 3.0
+    # 激光雷达的最大有效测距范围（单位：米），超出该值的激光点视为无效
+    maxRange: 12.0
+    # 用于建图的激光点最大距离（单位：米），需≤maxRange，减少远距离噪声干扰
+    maxUrange: 4.0
+    # 扫描匹配的最小分数阈值，低于该值的匹配结果视为无效，0.0表示不限制
+    minimum_score: 0.0
+    # 栅格被判定为“占据”的概率阈值，超过0.25标记为障碍物
+    occ_thresh: 0.25
+    # 似然计算的增益系数，放大似然值差异以增强优质匹配的权重
+    ogain: 3.0
+    # 粒子滤波中使用的粒子数量，数量越多定位建图精度可能越高但计算量越大
+    particles: 30
+    # ROS 2的QoS（服务质量）配置，控制话题消息传输策略
+    qos_overrides:
+      /parameter_events:
+        publisher:
+          depth: 1000          # 消息缓存深度
+          durability: volatile # 消息持久性（非持久化）
+          history: keep_last    # 消息历史记录策略（保留所有）
+          reliability: reliable # 消息可靠性（可靠传输）
+      /tf:
+        publisher:
+          depth: 1000          # 消息缓存深度
+          durability: volatile # 消息持久性（非持久化）
+          history: keep_last   # 消息历史记录策略（保留最新）
+          reliability: reliable # 消息可靠性（可靠传输）
+    # 重采样触发阈值（有效粒子占比），低于0.5时进行重采样以维持粒子多样性
+    resampleThreshold: 0.5
+    # 扫描匹配中栅格的标准差（单位：米），控制匹配平滑度
+    sigma: 0.05
+    # 运动模型噪声参数：平移运动的平移噪声系数
+    srr: 0.1
+    # 运动模型噪声参数：平移运动的旋转噪声系数
+    srt: 0.2
+    # 运动模型噪声参数：旋转运动的平移噪声系数
+    str: 0.1
+    # 运动模型噪声参数：旋转运动的旋转噪声系数
+    stt: 0.1
+    # 时间更新阈值（单位：秒），若未满足线/角更新条件，超过此时长强制更新地图
+    temporalUpdate: 2.0
+    # map到odom坐标系变换的发布周期（单位：秒），0.05表示20Hz
+    transform_publish_period: 0.05
+    # 是否使用仿真时间（/clock话题时间），false表示使用系统实际时间
+    use_sim_time: false
+    # 地图初始范围的最大x坐标（单位：米），超出时地图会自动扩展
+    xmax: 10.0
+    # 地图初始范围的最小x坐标（单位：米）
+    xmin: -10.0
+    # 地图初始范围的最大y坐标（单位：米）
+    ymax: 10.0
+    # 地图初始范围的最小y坐标（单位：米）
+    ymin: -10.0

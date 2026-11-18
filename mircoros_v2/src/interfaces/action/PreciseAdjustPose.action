@@ -1,0 +1,10 @@
+# Goal: target pose for precise adjustment
+geometry_msgs/Pose target_pose   # Target pose in map frame
+---
+# Result
+bool    success                  # Whether the adjustment completed successfully
+string  message                  # Result message with final error info
+---
+# Feedback
+float32 position_error           # Current position error (meters)
+float32 angle_error              # Current angle error (degrees)

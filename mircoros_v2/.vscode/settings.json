@@ -1,0 +1,44 @@
+{
+    "python.analysis.extraPaths": [
+        ""
+    ],
+    "todo-tree.general.tags": [
+        "TODO",
+        "FIXME",
+        "BUG",
+        "HACK",
+        "NOTE",
+        "WARNING",
+        "IMPORTANT",
+        "OPTIMIZE",
+        "REFACTOR"
+    ],
+    "todo-tree.highlights.defaultHighlight": {
+        "type": "tag",
+        "foreground": "#0000ff",
+        "background": "transparent",
+        "opacity": 1
+    },
+    "todo-tree.highlights.customHighlight": {
+        "TODO": {
+        "foreground": "#007acc",
+        "background": "#ffffff"
+        },
+        "FIXME": {
+        "foreground": "#ff0000",
+        "background": "#ffffff"
+        },
+        "BUG": {
+        "foreground": "#ff6600",
+        "background": "#ffffff"
+        },
+        "NOTE": {
+        "foreground": "#00aa00",
+        "background": "#ffffff"
+        },
+        "WARNING": {
+        "foreground": "#ffaa00",
+        "background": "#ffffff"
+        }
+    }
+}

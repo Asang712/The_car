@@ -1,0 +1,7 @@
+# Request: empty
+---
+# Response
+bool success
+float64 x        # 云台水平角度 (deg)
+float64 y        # 云台俯仰角度 (deg)
+string message

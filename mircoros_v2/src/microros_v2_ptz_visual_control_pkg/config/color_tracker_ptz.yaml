@@ -1,0 +1,65 @@
+color_tracker_ptz_node:
+  ros__parameters:
+    # 当前 MicroROS-V2 实际接口
+    image_topic: "/camera/image_raw"
+    ptz_topic: "/cmd_ptz_angle"
+    debug_image_topic: "/color_tracker_ptz/debug_image"
+
+    # 图像与调试窗口
+    image_width: 320
+    image_height: 240
+    display_debug_window: true
+    publish_debug_image: false
+    window_name: "color_tracker_ptz"
+    window_width: 960
+    window_height: 540
+    auto_start_tracking: false
+
+    # HSV 阈值文件。launch 默认会覆盖为 package_share/config/color_hsv.txt
+    hsv_file: ""
+
+    # 默认 HSV，若 hsv_file 无有效内容，则使用这里的值
+    Hmin: 0
+    Smin: 85
+    Vmin: 126
+    Hmax: 9
+    Smax: 253
+    Vmax: 253
+
+    # 鼠标框选取色时的阈值扩展量
+    h_expand: 5
+    s_expand: 20
+    v_expand: 20
+
+    # 目标过滤，增大可过滤小噪点，减小可识别更小目标
+    min_target_radius: 8.0
+    min_target_area: 100.0
+    morph_kernel_size: 5
+
+    # 云台初始角度与限幅
+    ptz_init_x: 0.0
+    ptz_init_y: -45.0
+    ptz_x_min: -90.0
+    ptz_x_max: 90.0
+    ptz_y_min: -90.0
+    ptz_y_max: 20.0
+    ptz_x_reverse: false
+    ptz_y_reverse: false
+    init_publish_count: 10
+
+    # 云台控制，PD 参数越大响应越强，max_ptz_step 越大单次角度变化越大
+    deadband_x: 20.0
+    deadband_y: 20.0
+    pd_kp: 0.7
+    pd_kd: 0.25
+    ptz_step_smooth_alpha: 0.35
+    max_ptz_step: 1.2
+
+    # 目标丢失保护
+    lost_target_stop: true
+    lost_timeout: 1.0
+
+    target_smooth_alpha: 0.6
+    ptz_smooth_alpha: 0.85
+    ptz_control_rate: 25.0
+    param_reload_interval: 1.0

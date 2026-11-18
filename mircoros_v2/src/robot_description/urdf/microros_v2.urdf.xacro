@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro"
+  name="microros_v2">
+
+  <xacro:include filename="$(find robot_description)/urdf/camera.urdf.xacro"/>
+
+  <!-- camera_type: ptz | no_ptz | basic_car -->
+  <xacro:arg name="camera_type" default="ptz"/>
+
+  <!-- namespace: distinguish different robots, default empty -->
+  <xacro:arg name="namespace" default=""/>
+  <xacro:property name="prefix"
+    value="${'$(arg namespace)/' if '$(arg namespace)' != '' else ''}"/>
+
+  <!-- base_link mesh: no_ptz uses base_link_noptz.STL, ptz/basic_car use base_link.STL -->
+  <xacro:property name="base_link_mesh"
+    value="${'base_link_noptz.STL' if '$(arg camera_type)' == 'no_ptz' else 'base_link.STL'}"/>
+
+  <!-- base_footprint -->
+  <link
+    name="${prefix}base_footprint">
+  </link>
+  <joint
+    name="${prefix}basetofootprint"
+    type="fixed">
+    <origin
+      xyz="0.0 0.0 0.02"
+      rpy="0 0 0" />
+    <parent
+      link="${prefix}base_footprint" />
+    <child
+      link="${prefix}base_link" />
+  </joint>
+
+  <!-- car base -->
+  <link
+    name="${prefix}base_link">
+    <inertial>
+      <origin
+        xyz="0.0125358449468065 6.2338964078765E-07 0.0329029674944082"
+        rpy="0 0 0" />
+      <mass
+        value="0.549545262878645" />
+      <inertia
+        ixx="0.000494117990279825"
+        ixy="7.47435050338857E-08"
+        ixz="-5.82265935748093E-08"
+        iyy="0.00056957019186456"
+        iyz="-1.73647671262012E-07"
+        izz="0.00100869032893883" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/${base_link_mesh}" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/${base_link_mesh}" />
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- front left wheel -->
+  <link
+    name="${prefix}lfwheel_Link">
+    <inertial>
+      <origin
+        xyz="6.95126928240697E-10 -0.00121232203632964 -2.60019417955282E-06"
+        rpy="0 0 0" />
+      <mass
+        value="0.0570182725594528" />
+      <inertia
+        ixx="2.0645893856172E-05"
+        ixy="8.18493404907766E-14"
+        ixz="-1.8915639135423E-13"
+        iyy="3.5944621316213E-05"
+        iyz="-8.33259000156348E-10"
+        izz="2.06525471496211E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/lfwheel_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0 0 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/lfwheel_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="${prefix}lfwheel"
+    type="fixed">
+    <origin
+      xyz="0.058 0.0857 0.011"
+      rpy="0 0 0" />
+    <parent
+      link="${prefix}base_link" />
+    <child
+      link="${prefix}lfwheel_Link" />
+  </joint>
+
+  <!-- front right wheel -->
+  <link
+    name="${prefix}rfwheel_Link">
+    <inertial>
+      <origin
+        xyz="-6.94300214543198E-10 0.00121232203632965 -2.60019274769818E-06"
+        rpy="0 0 0" />
+      <mass
+        value="0.0570182725594528" />
+      <inertia
+        ixx="2.06458938734803E-05"
+        ixy="8.19515671535864E-14"
+        ixz="1.86461814790352E-13"
+        iyy="3.5944621316213E-05"
+        iyz="8.33259004551958E-10"
+        izz="2.06525471323128E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/rfwheel_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0 0 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/rfwheel_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="${prefix}rfwheel"
+    type="fixed">
+    <origin
+      xyz="0.058 -0.0857 0.011"
+      rpy="0 0 0" />
+    <parent
+      link="${prefix}base_link" />
+    <child
+      link="${prefix}rfwheel_Link" />
+  </joint>
+
+  <!-- bwheel -->
+  <link
+    name="${prefix}bwheel_Link">
+    <inertial>
+      <origin
+        xyz="1.38777878078145E-17 5.00468033805939E-20 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.00115034650998946" />
+      <inertia
+        ixx="1.94408560188219E-08"
+        ixy="0"
+        ixz="0"
+        iyy="1.94408560188219E-08"
+        iyz="0"
+        izz="1.94408560188219E-08" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/bwheel_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/bwheel_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="${prefix}bwheel"
+    type="fixed">
+    <origin
+      xyz="-0.0665 0 -0.0155"
+      rpy="0 0 0" />
+    <parent
+      link="${prefix}base_link" />
+    <child
+      link="${prefix}bwheel_Link" />
+  </joint>
+
+  <!-- laser -->
+  <link
+    name="${prefix}laser_frame">
+    <inertial>
+      <origin
+        xyz="8.01192970789413E-05 -0.000142837223458574 -0.0125536403657815"
+        rpy="0 0 0" />
+      <mass
+        value="0.0099262993831876" />
+      <inertia
+        ixx="1.91413177271348E-06"
+        ixy="-2.34516063220984E-08"
+        ixz="3.84281721109691E-09"
+        iyy="1.8985026286829E-06"
+        iyz="-1.82879279848532E-09"
+        izz="3.33334865875319E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/laser_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.113725490196078 0.113725490196078 0.113725490196078 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/laser_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="${prefix}laser"
+    type="fixed">
+    <origin
+      xyz="-0.028 0 0.13381"
+      rpy="0 0 0" />
+    <parent
+      link="${prefix}base_link" />
+    <child
+      link="${prefix}laser_frame" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <!-- camera (from camera.urdf.xacro) -->
+  <xacro:camera camera_type="${xacro.arg('camera_type')}" namespace="$(arg namespace)"/>
+
+  <!-- IMU -->
+  <link
+    name="${prefix}imu_frame">
+    <inertial>
+      <origin
+        xyz="9.0175256466582E-06 -7.11691852974894E-06 -0.000427825976564249"
+        rpy="0 0 0" />
+      <mass
+        value="6.41461765868121E-06" />
+      <inertia
+        ixx="3.73173916133639E-12"
+        ixy="-9.90504774848673E-17"
+        ixz="-5.30077205925745E-17"
+        iyy="5.20429718417241E-12"
+        iyz="4.64895300496025E-17"
+        izz="8.15283418319354E-12" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/IMU_Link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://robot_description/meshes/IMU_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="${prefix}IMU"
+    type="fixed">
+    <origin
+      xyz="-0.047431 -0.00073372 0.074601"
+      rpy="0 0 0" />
+    <parent
+      link="${prefix}base_link" />
+    <child
+      link="${prefix}imu_frame" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+</robot>

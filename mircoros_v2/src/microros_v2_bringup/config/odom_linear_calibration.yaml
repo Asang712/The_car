@@ -1,0 +1,3 @@
+microros_v2_patrol_node:
+  ros__parameters:
+    odom_linear_scale_correction: 1.26

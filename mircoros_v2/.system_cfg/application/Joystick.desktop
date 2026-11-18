@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=JoystickControl
+Exec=/home/yahboom/microros_ws/src/scripts/joystick_control.sh
+Icon=/home/yahboom/microros_ws/.system_cfg/icon/joystick.png
+Terminal=false
+Type=Application
+Categories=Utility;Robot;
