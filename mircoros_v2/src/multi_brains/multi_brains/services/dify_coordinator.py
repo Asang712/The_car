@@ -9,6 +9,7 @@ without exposing the lock.
 
 import os
 import threading
+import time
 
 from ..core.feedback_protocol import build_dify_inputs
 from ..utils.common_tools import extract_json_content
@@ -130,40 +131,55 @@ class DifyCoordinator:
                 f"conversation_id={active_conversation_id}"
             )
 
-        try:
-            with self.call_lock:
-                result = self.client.create_chat_message_stream(**kwargs)
-                if self.node.debug_mode:
-                    self.node.get_logger().info("[DIFY] <<< streaming 完成")
+        max_retries = 2
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                with self.call_lock:
+                    result = self.client.create_chat_message_stream(**kwargs)
+                    if self.node.debug_mode:
+                        self.node.get_logger().info("[DIFY] <<< streaming 完成")
 
-                response_conversation_id = result.get("conversation_id")
-                if (
-                    update_conversation_id
-                    and not self.node.should_interrupt()
-                    and response_conversation_id
-                ):
-                    self.set_conversation_id(response_conversation_id)
+                    response_conversation_id = result.get("conversation_id")
+                    if (
+                        update_conversation_id
+                        and not self.node.should_interrupt()
+                        and response_conversation_id
+                    ):
+                        self.set_conversation_id(response_conversation_id)
 
-                if self.node.debug_mode:
-                    message_id = result.get("message_id", "")
-                    answer = result.get("answer", "")
-                    self.node.get_logger().info(
-                        f"[DIFY] message_id={message_id}, "
-                        f"conversation_id={response_conversation_id}"
-                    )
-                    self.node.get_logger().info(
-                        f"[DIFY] 完整answer({len(answer)}字符): {answer[:300]}"
-                    )
+                    if self.node.debug_mode:
+                        message_id = result.get("message_id", "")
+                        answer = result.get("answer", "")
+                        self.node.get_logger().info(
+                            f"[DIFY] message_id={message_id}, "
+                            f"conversation_id={response_conversation_id}"
+                        )
+                        self.node.get_logger().info(
+                            f"[DIFY] 完整answer({len(answer)}字符): {answer[:300]}"
+                        )
 
-            return result
-        except RuntimeError as error:
-            self.node.get_logger().error(f"[DIFY] streaming 错误: {error}")
-            return None
-        except Exception as error:
-            self.node.get_logger().error(
-                f"[DIFY] 调用异常: {type(error).__name__}: {error}"
-            )
-            return None
+                return result
+            except RuntimeError as error:
+                last_error = error
+                self.node.get_logger().warn(
+                    f"[DIFY] streaming 错误 (第{attempt+1}次): {error}"
+                )
+            except Exception as error:
+                last_error = error
+                self.node.get_logger().warn(
+                    f"[DIFY] 调用异常 (第{attempt+1}次): "
+                    f"{type(error).__name__}: {error}"
+                )
+            if attempt < max_retries:
+                wait = 2 * (attempt + 1)
+                self.node.get_logger().info(f"[DIFY] {wait}秒后重试...")
+                time.sleep(wait)
+                if self.node.should_interrupt():
+                    return None
+
+        self.node.get_logger().error(f"[DIFY] 重试{max_retries}次后仍失败: {last_error}")
+        return None
 
     def upload_images(self, image_paths: list) -> list | None:
         """Upload feedback images and return Dify chat-messages file objects."""

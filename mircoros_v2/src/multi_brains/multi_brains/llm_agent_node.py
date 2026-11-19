@@ -30,7 +30,7 @@ import cv2
 
 import rclpy
 from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor, ExternalShutdownException
 from rclpy.qos import (
     QoSProfile,
     QoSHistoryPolicy,
@@ -1237,9 +1237,19 @@ def main(args=None):
         executor.spin()
     except KeyboardInterrupt:
         pass
+    except ExternalShutdownException:
+        pass
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        try:
+            if rclpy.ok():
+                node.destroy_node()
+        except Exception:
+            pass
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

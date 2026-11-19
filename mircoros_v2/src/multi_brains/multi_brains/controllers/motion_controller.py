@@ -44,8 +44,11 @@ class MotionController:
         self.max_duration = float(motion_config.get("max_duration_sec", 60.0))
         self.max_turn_angle = float(motion_config.get("max_turn_angle_deg", 720.0))
 
-    def execute_move_forward(self, speed: str = "0.2", duration: str = "1.0") -> bool:
-        """Drive forward at ``speed`` m/s for ``duration`` seconds."""
+    def execute_move_forward(self, duration: str = "1.0", speed: str = "0.2") -> bool:
+        """Drive forward at ``speed`` m/s for ``duration`` seconds.
+
+        单参数调用时 (e.g. move_forward(1.0)) 视为 duration，speed 用默认值。
+        """
         values = self._validate_linear_action(speed, duration)
         if values is None:
             return False
@@ -56,8 +59,11 @@ class MotionController:
         )
         return self._execute_velocity(linear_speed, 0.0, run_duration)
 
-    def execute_move_backward(self, speed: str = "0.2", duration: str = "1.0") -> bool:
-        """Drive backward at ``speed`` m/s for ``duration`` seconds."""
+    def execute_move_backward(self, duration: str = "1.0", speed: str = "0.2") -> bool:
+        """Drive backward at ``speed`` m/s for ``duration`` seconds.
+
+        单参数调用时 (e.g. move_backward(1.0)) 视为 duration，speed 用默认值。
+        """
         values = self._validate_linear_action(speed, duration)
         if values is None:
             return False
