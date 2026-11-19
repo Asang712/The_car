@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 """Chassis velocity control for differential-drive motion.
 
-Owns the timed ``Twist`` publication loops for forward/backward/turn actions.
-Interrupt and stop semantics are delegated back to the owning node so the
-"latest command wins" policy and KCF-tracking teardown stay centralized.
+所有动作统一为 **时间基控制**：参数顺序都是 ``(duration, speed)``，
+duration 单位是秒，speed 是可选的覆盖默认速度（不传就用默认值）。
+单参数调用（``move_forward(3.0)``）自动视为 duration，speed 取默认值。
+
+这样 System Prompt 里写的 ``move_forward(时长秒)`` 就能直接对应代码签名，
+LLM 不会再把"速度"当成"时长"用。
 """
 
 import math
@@ -41,15 +44,24 @@ class MotionController:
         motion_config = (config or {}).get("MOTION", {})
         self.max_linear_speed = float(motion_config.get("max_linear_speed", 0.5))
         self.max_angular_speed = float(motion_config.get("max_angular_speed", 1.5))
-        self.max_duration = float(motion_config.get("max_duration_sec", 60.0))
+        self.max_duration = float(motion_config.get("max_duration_sec", 120.0))
         self.max_turn_angle = float(motion_config.get("max_turn_angle_deg", 720.0))
+        # 默认速度，LLM 不传第二参数时用
+        self.default_linear_speed = float(
+            motion_config.get("default_linear_speed", 0.2)
+        )
+        self.default_angular_speed = float(
+            motion_config.get("default_angular_speed", 0.6)
+        )
 
-    def execute_move_forward(self, duration: str = "1.0", speed: str = "0.2") -> bool:
-        """Drive forward at ``speed`` m/s for ``duration`` seconds.
+    # ---- 前进 / 后退（时间基）-------------------------------------
 
-        单参数调用时 (e.g. move_forward(1.0)) 视为 duration，speed 用默认值。
+    def execute_move_forward(self, duration: str = "1.0", speed: str = "") -> bool:
+        """前进: ``duration`` 秒, ``speed`` m/s（空则用默认 0.2m/s）。
+
+        单参数调用如 ``move_forward(5.0)`` → 前进 5 秒, 速度 0.2m/s。
         """
-        values = self._validate_linear_action(speed, duration)
+        values = self._validate_motion(speed, duration, "线速度")
         if values is None:
             return False
         linear_speed, run_duration = values
@@ -59,12 +71,9 @@ class MotionController:
         )
         return self._execute_velocity(linear_speed, 0.0, run_duration)
 
-    def execute_move_backward(self, duration: str = "1.0", speed: str = "0.2") -> bool:
-        """Drive backward at ``speed`` m/s for ``duration`` seconds.
-
-        单参数调用时 (e.g. move_backward(1.0)) 视为 duration，speed 用默认值。
-        """
-        values = self._validate_linear_action(speed, duration)
+    def execute_move_backward(self, duration: str = "1.0", speed: str = "") -> bool:
+        """后退: 同前进，速度反向。"""
+        values = self._validate_motion(speed, duration, "线速度")
         if values is None:
             return False
         linear_speed, run_duration = values
@@ -74,27 +83,38 @@ class MotionController:
         )
         return self._execute_velocity(-linear_speed, 0.0, run_duration)
 
-    def execute_turn_left(self, angle: str = "90", speed: str = "0.5") -> bool:
-        """Turn left in place by ``angle`` degrees at ``speed`` rad/s."""
-        values = self._validate_turn_action(angle, speed)
-        if values is None:
-            return False
-        turn_angle, angular_speed = values
-        self.node.get_logger().info(
-            f"[MOTION] 左转: angle={turn_angle}°, speed={angular_speed}rad/s"
-        )
-        return self._execute_turn(turn_angle, angular_speed, 1.0)
+    # ---- 左转 / 右转（时间基）-------------------------------------
 
-    def execute_turn_right(self, angle: str = "90", speed: str = "0.5") -> bool:
-        """Turn right in place by ``angle`` degrees at ``speed`` rad/s."""
-        values = self._validate_turn_action(angle, speed)
+    def execute_turn_left(self, duration: str = "2.0", speed: str = "") -> bool:
+        """原地左转: ``duration`` 秒, ``speed`` rad/s（空则默认 0.6）。
+
+        单参数 ``turn_left(3.0)`` → 左转 3 秒（约 103° at 0.6rad/s）。
+        """
+        values = self._validate_motion(speed, duration, "角速度")
         if values is None:
             return False
-        turn_angle, angular_speed = values
+        angular_speed, run_duration = values
+        estimated_deg = math.degrees(angular_speed * run_duration)
         self.node.get_logger().info(
-            f"[MOTION] 右转: angle={turn_angle}°, speed={angular_speed}rad/s"
+            f"[MOTION] 左转: speed={angular_speed}rad/s, duration={run_duration}s, "
+            f"角度≈{estimated_deg:.0f}°"
         )
-        return self._execute_turn(turn_angle, angular_speed, -1.0)
+        return self._execute_turn_time(angular_speed, run_duration, 1.0)
+
+    def execute_turn_right(self, duration: str = "2.0", speed: str = "") -> bool:
+        """原地右转: 同左转，方向反向。"""
+        values = self._validate_motion(speed, duration, "角速度")
+        if values is None:
+            return False
+        angular_speed, run_duration = values
+        estimated_deg = math.degrees(angular_speed * run_duration)
+        self.node.get_logger().info(
+            f"[MOTION] 右转: speed={angular_speed}rad/s, duration={run_duration}s, "
+            f"角度≈{estimated_deg:.0f}°"
+        )
+        return self._execute_turn_time(angular_speed, run_duration, -1.0)
+
+    # ---- 底层执行 ------------------------------------------------
 
     def _execute_velocity(
         self, linear_x: float, angular_z: float, duration: float
@@ -115,42 +135,13 @@ class MotionController:
         self.node.execute_stop(recenter_camera=False)
         return True
 
-    def _validate_linear_action(self, speed, duration):
-        try:
-            return (
-                parse_positive_float(speed, "线速度", self.max_linear_speed),
-                parse_positive_float(duration, "运动时长", self.max_duration),
-            )
-        except ValueError as error:
-            self.node.get_logger().error(f"[MOTION] 参数无效: {error}")
-            return None
-
-    def _validate_turn_action(self, angle, speed):
-        try:
-            turn_angle = parse_positive_float(angle, "转向角度", self.max_turn_angle)
-            angular_speed = parse_positive_float(
-                speed, "角速度", self.max_angular_speed
-            )
-            turn_duration = math.radians(turn_angle) / angular_speed
-            if not math.isfinite(turn_duration) or turn_duration > self.max_duration:
-                raise ValueError(
-                    f"预计转向时长超过安全上限{self.max_duration}: "
-                    f"{turn_duration:.2f}"
-                )
-            return turn_angle, angular_speed
-        except ValueError as error:
-            self.node.get_logger().error(f"[MOTION] 参数无效: {error}")
-            return None
-
-    def _execute_turn(self, angle_deg: float, speed: float, direction: float) -> bool:
-        """Turn in place for the duration implied by angle and speed."""
-        angle_rad = math.radians(angle_deg)
-        angular_speed = speed * direction
-        duration = abs(angle_rad / angular_speed)
-
+    def _execute_turn_time(
+        self, angular_speed: float, duration: float, direction: float
+    ) -> bool:
+        """原地转动 ``duration`` 秒。"""
         twist = Twist()
         twist.linear.x = 0.0
-        twist.angular.z = angular_speed
+        twist.angular.z = angular_speed * direction
 
         start_time = time.time()
         while time.time() - start_time < duration:
@@ -163,3 +154,30 @@ class MotionController:
         self.node.execute_stop(recenter_camera=False)
         return True
 
+    # ---- 参数校验 ------------------------------------------------
+
+    def _validate_motion(self, speed_str, duration_str, speed_name):
+        """统一参数校验。speed_str 为空 → 用默认速度。"""
+        try:
+            speed_max = (
+                self.max_linear_speed
+                if speed_name == "线速度"
+                else self.max_angular_speed
+            )
+            speed_default = (
+                self.default_linear_speed
+                if speed_name == "线速度"
+                else self.default_angular_speed
+            )
+            speed_val = (
+                speed_default
+                if speed_str == "" or speed_str is None
+                else parse_positive_float(speed_str, speed_name, speed_max)
+            )
+            duration_val = parse_positive_float(
+                duration_str, "运动时长", self.max_duration
+            )
+            return speed_val, duration_val
+        except ValueError as error:
+            self.node.get_logger().error(f"[MOTION] 参数无效: {error}")
+            return None

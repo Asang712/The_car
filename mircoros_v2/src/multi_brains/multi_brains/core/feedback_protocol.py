@@ -24,10 +24,17 @@ def partition_actions(actions: list) -> tuple:
     return executable_actions, any(is_finish_action(action) for action in actions)
 
 
-def select_round_action(actions: list) -> tuple:
-    """Select at most one executable action for the current feedback round."""
+def select_round_action(actions: list, max_per_round: int = 10) -> tuple:
+    """Select up to ``max_per_round`` executable actions per feedback round.
+
+    The LLM may batch several sequential actions (e.g. multiple move_forward
+    calls to cover a long distance). We execute them all before reporting
+    back to Dify for the next round.
+    """
     executable_actions, finish_requested = partition_actions(actions)
-    return executable_actions[:1], executable_actions[1:], finish_requested
+    selected = executable_actions[:max_per_round]
+    remaining = executable_actions[max_per_round:]
+    return selected, remaining, finish_requested
 
 
 def build_action_feedback(config: dict, actions: list, success: bool) -> str:
