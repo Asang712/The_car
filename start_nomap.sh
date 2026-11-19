@@ -3,6 +3,7 @@
 # 用法:
 #   ./start_nomap.sh            # 启动全部进程，Ctrl+C 统一退出
 #   ./start_nomap.sh --check    # 只做环境自检，不启动进程
+#   ./start_nomap.sh --stop     # 停止 Agent、主系统与位姿桥接
 # 可用环境变量: ROS_DOMAIN_ID(默认40)、AGENT_WS、AGENT_PORT、LOG_DIR
 set -uo pipefail
 
@@ -24,7 +25,7 @@ log() { printf '[nomap] %s\n' "$*"; }
 die() { printf '[nomap] 错误: %s\n' "$*" >&2; exit 1; }
 
 usage() {
-    sed -n '2,7p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '2,8p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 # launch 通过 GetCameraUrl() 读取该文件，缺失会直接抛 FileNotFoundError
@@ -94,15 +95,25 @@ stop_tree() {
     kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
 }
 
+# 按可执行路径兜底清理，覆盖脱离进程组的 launch 子进程
+stop_all() {
+    pkill -f "$AGENT_WS/install/micro_ros_agent/lib/micro_ros_agent/" 2>/dev/null
+    pkill -f "ros2 run micro_ros_agent" 2>/dev/null
+    pkill -f "$WS_DIR/install/microros_v2_bringup/lib/" 2>/dev/null
+    pkill -f "$WS_DIR/install/ros_robot_app/lib/ros_robot_app/" 2>/dev/null
+    pkill -f "ros_robot_app/odom_pose_bridge.py" 2>/dev/null
+    pkill -f "ros2 launch microros_v2_bringup" 2>/dev/null
+    pkill -f "rosbridge_websocket_launch.xml" 2>/dev/null
+    pkill -f "/opt/ros/jazzy/lib/rosbridge_server/rosbridge_websocket" 2>/dev/null
+    pkill -f "/opt/ros/jazzy/lib/rosapi/rosapi_node" 2>/dev/null
+}
+
 cleanup() {
     log "正在停止所有进程..."
     stop_tree "$LAUNCH_PID"
     stop_tree "$BRIDGE_PID"
     stop_tree "$AGENT_PID"
-    # launch 的子进程可能脱离进程组，按可执行路径兜底清理
-    pkill -f "$WS_DIR/install/microros_v2_bringup/lib/microros_v2_bringup/" 2>/dev/null
-    pkill -f "$AGENT_WS/install/micro_ros_agent/lib/micro_ros_agent/" 2>/dev/null
-    pkill -f "ros_robot_app/odom_pose_bridge.py" 2>/dev/null
+    stop_all
     wait 2>/dev/null
 }
 
@@ -113,6 +124,12 @@ fi
 
 if [ "${1:-}" = "--check" ]; then
     check_env
+    exit 0
+fi
+
+if [ "${1:-}" = "--stop" ]; then
+    stop_all
+    log "已停止 Agent、主系统与位姿桥接"
     exit 0
 fi
 
@@ -138,6 +155,9 @@ if command -v flock >/dev/null 2>&1; then
 fi
 
 log "ROS_DOMAIN_ID=$DOMAIN_ID，日志目录 $LOG_DIR"
+
+# 必须在启动子进程前挂上信号处理，否则启动过程中按 Ctrl+C 会留下孤儿进程并占住锁
+trap 'cleanup; exit 0' INT TERM
 
 setsid ros2 run micro_ros_agent micro_ros_agent udp4 --port "$AGENT_PORT" -v6 \
     >"$LOG_DIR/agent.log" 2>&1 &
@@ -165,7 +185,6 @@ log "Agent PID=$AGENT_PID，主系统 PID=$LAUNCH_PID，位姿桥接 PID=$BRIDGE
 log "相机与压缩图传日志: $LOG_DIR/bringup.log"
 log "按 Ctrl+C 停止全部进程"
 
-trap 'cleanup; exit 0' INT TERM
 while kill -0 "$AGENT_PID" 2>/dev/null \
     && kill -0 "$LAUNCH_PID" 2>/dev/null \
     && kill -0 "$BRIDGE_PID" 2>/dev/null; do
