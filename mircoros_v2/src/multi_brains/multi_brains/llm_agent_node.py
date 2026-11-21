@@ -71,6 +71,7 @@ from multi_brains.controllers.follow_line_controller import FollowLineController
 from multi_brains.controllers.motion_controller import MotionController
 from multi_brains.controllers.navigation_controller import NavigationController
 from multi_brains.controllers.ptz_controller import PtzController
+from multi_brains.controllers.visual_servo_controller import VisualServoController
 from multi_brains.core.command_state import CommandState
 from multi_brains.services.dify_coordinator import DifyCoordinator
 from multi_brains.utils.common_tools import kill_process_tree
@@ -107,6 +108,9 @@ class LlmAgentNode(Node):
         # 装配控制器
         self.ptz = PtzController(self, self.config, self.car_type)
         self.motion = MotionController(self, self.cmd_vel_pub, self.config)
+        self.visual_servo = VisualServoController(
+            self, self.cmd_vel_pub, self.config
+        )
         self.navigation = NavigationController(self, self.config)
         self.follow_line_controller = FollowLineController(
             self, self.config, self.cmd_vel_pub
@@ -294,6 +298,7 @@ class LlmAgentNode(Node):
             "track_kcf": self.kcf.execute_track_kcf,
             "seewhat": self.execute_seewhat,
             "move_forward": self.motion.execute_move_forward,
+            "find_object": self.visual_servo.execute_find_object,
             "move_backward": self.motion.execute_move_backward,
             "turn_left": self.motion.execute_turn_left,
             "turn_right": self.motion.execute_turn_right,

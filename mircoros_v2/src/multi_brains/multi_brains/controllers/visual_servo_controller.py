@@ -236,17 +236,20 @@ class VisualServoController:
             self._stop()
             return False
         finally:
-            if self.node.should_interrupt() or True:
-                self._stop()
+            self._stop()
 
     # ---- 检测 -----------------------------------------------------
 
     def _update_detection(self, ranges):
         """在最新一帧上做颜色检测；图像未更新时复用上次结果。"""
-        frame = self._latest_frame()
+        frame, seq = self._latest_frame()
         if frame is None:
             self._last_detection = None
+            self._last_detection_time = 0.0
             return None
+        if seq == self._last_seq:
+            return self._last_detection if self._is_fresh(time.monotonic()) else None
+        self._last_seq = seq
 
         detection = self._detect_blob(frame, ranges)
         if detection is not None:
@@ -260,14 +263,13 @@ class VisualServoController:
     def _latest_frame(self):
         lock = getattr(self.node, "latest_image_lock", None)
         if lock is None:
-            return None
+            return None, 0
         with lock:
             image = getattr(self.node, "latest_cv_image", None)
             seq = getattr(self.node, "latest_image_seq", 0)
         if image is None:
-            return None
-        self._last_seq = seq
-        return image
+            return None, seq
+        return image, seq
 
     def _detect_blob(self, frame, ranges):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -310,7 +312,7 @@ class VisualServoController:
         )
 
     def _frame_width(self):
-        frame = self._latest_frame()
+        frame, _ = self._latest_frame()
         if frame is None:
             return 640.0
         return float(frame.shape[1])
