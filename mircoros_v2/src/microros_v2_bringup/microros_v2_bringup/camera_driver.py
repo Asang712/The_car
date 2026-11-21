@@ -5,6 +5,7 @@ import threading
 import yaml
 import cv2
 import rclpy
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import Image, CameraInfo
@@ -20,6 +21,17 @@ class IPCameraPublisher(Node):
         self.declare_parameter('reconnect_max_delay', 30.0)
         self.declare_parameter('ost_file', '')
         self.ost_file = self.get_parameter('ost_file').get_parameter_value().string_value
+        if not self.ost_file:
+            # 直跑 camera_driver.py 未传 ost_file 时，回退到包内标定文件，
+            # 避免 CameraInfo 因空路径而停止发布。
+            try:
+                self.ost_file = os.path.join(
+                    get_package_share_directory('microros_v2_bringup'),
+                    'config', 'ost.yaml'
+                )
+                self.get_logger().info(f'ost_file not set, fallback to package default: {self.ost_file}')
+            except Exception as e:
+                self.get_logger().warn(f'Cannot resolve default ost_file: {e}')
 
         self.startup_delay = self._get_float_parameter('startup_delay', 3.0)
         self.reconnect_min_delay = self._get_float_parameter('reconnect_min_delay', 1.0)
