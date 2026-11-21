@@ -129,10 +129,14 @@ if [ "$MODE" = "once" ]; then
     exit 0
 fi
 
-trap 'log "收到退出信号，停止自动推送"; exit 0' INT TERM
+SLEEP_PID=""
+trap 'log "收到退出信号，停止自动推送"; [ -n "$SLEEP_PID" ] && kill "$SLEEP_PID" 2>/dev/null; exit 0' INT TERM
 log "自动推送已启动: $REMOTE/$BRANCH，间隔 ${INTERVAL}s，仓库 $REPO_DIR"
 while :; do
     push_once
-    sleep "$INTERVAL" &
-    wait $!
+    # 9>&- 防止 sleep 继承锁 fd：否则父进程被杀后 sleep 仍持锁，新实例无法启动
+    sleep "$INTERVAL" 9>&- &
+    SLEEP_PID=$!
+    wait "$SLEEP_PID"
+    SLEEP_PID=""
 done
