@@ -174,7 +174,7 @@ class VisualServoController:
                             self.node.get_logger().info("[SERVO] 已完成对准，开始靠近")
                             continue
                         angular = clamp(
-                            error * self.align_kp,
+                            -error * self.align_kp,
                             -self.max_angular_speed,
                             self.max_angular_speed,
                         )
@@ -197,7 +197,7 @@ class VisualServoController:
                         cx, _cy, radius = detection
                         error = cx - self._frame_width() * 0.5
                         angular = clamp(
-                            error * self.align_kp,
+                            -error * self.align_kp,
                             -self.max_angular_speed,
                             self.max_angular_speed,
                         )
