@@ -73,6 +73,7 @@ from multi_brains.controllers.navigation_controller import NavigationController
 from multi_brains.controllers.ptz_controller import PtzController
 from multi_brains.controllers.visual_servo_controller import VisualServoController
 from multi_brains.core.command_state import CommandState
+from multi_brains.core.local_command_parser import LocalCommandParser
 from multi_brains.services.dify_coordinator import DifyCoordinator
 from multi_brains.utils.common_tools import kill_process_tree
 
@@ -115,7 +116,12 @@ class LlmAgentNode(Node):
         self.follow_line_controller = FollowLineController(
             self, self.config, self.cmd_vel_pub
         )
-        self.dify = DifyCoordinator(self, self.config)
+        self.local_parser = LocalCommandParser(self.config)
+        self.dify = None
+        if self.command_mode == "dify":
+            self.dify = DifyCoordinator(self, self.config)
+        else:
+            self.get_logger().info("[LOCAL] 本地固定指令模式已启用，Dify 不会初始化")
         self.kcf = KcfTracker(
             self, self.config, self.car_type, self.cmd_vel_pub, self.ptz
         )
@@ -143,6 +149,13 @@ class LlmAgentNode(Node):
             with open(config_file, "r", encoding="utf-8") as config_stream:
                 self.config = yaml.safe_load(config_stream) or {}
 
+        self.command_mode = str(self.config.get("COMMAND_MODE", "local")).strip().lower()
+        if self.command_mode not in ("local", "dify"):
+            self.get_logger().warn(
+                f"[CONFIG] 未知 COMMAND_MODE={self.command_mode}，回退到 local"
+            )
+            self.command_mode = "local"
+
         # Dify 配置改从 robot_info.json（robot_tool.GetRobotInfo）读取
         try:
             robot_info = GetRobotInfo() or {}
@@ -153,7 +166,7 @@ class LlmAgentNode(Node):
         self.config["DIFY_BASE_URL"] = dify_base_url or "http://localhost/v1"
         dify_api_key = str(robot_info.get("DIFY_API_KEY", "") or "").strip()
         self.config["DIFY_API_KEY"] = dify_api_key
-        if not dify_api_key:
+        if not dify_api_key and self.command_mode == "dify":
             self.get_logger().warn("[CONFIG] robot_info.json 中未设置 DIFY_API_KEY")
 
         self.debug_mode = self.config.get("DEBUG_MODE", False)
@@ -172,7 +185,8 @@ class LlmAgentNode(Node):
         self.car_type = resolve_car_type(environment_car_type, configured_car_type)
         system_config["hardware_variant"] = self.car_type
         self.get_logger().info(
-            f"[CONFIG] DEBUG_MODE={self.debug_mode}, LANGUAGE={self.language}, "
+            f"[CONFIG] COMMAND_MODE={self.command_mode}, "
+            f"DEBUG_MODE={self.debug_mode}, LANGUAGE={self.language}, "
             f"CAR_TYPE={self.car_type} ({CAR_TYPE_LABELS[self.car_type]})"
         )
 
@@ -340,13 +354,15 @@ class LlmAgentNode(Node):
             )
 
         if user_text == "__reset_conversation__":
-            self.dify.reset_conversation_id()
-            self.publish_latest_response(
-                command_id,
-                "对话上下文已重置",
-                "[]",
-                "",
+            if self.dify is not None:
+                self.dify.reset_conversation_id()
+            self.local_parser.reset_history()
+            response = (
+                "对话上下文已重置"
+                if self.command_mode == "dify"
+                else "本地指令历史已重置"
             )
+            self.publish_latest_response(command_id, response, "[]", "")
             return
 
         self.worker_thread = threading.Thread(
@@ -362,6 +378,10 @@ class LlmAgentNode(Node):
             self.get_logger().info(
                 f"[INPUT] 指令#{command_id} 已被更新指令替代，停止处理"
             )
+            return
+
+        if self.command_mode == "local":
+            self.process_local_command(command_id, user_text)
             return
 
         self.publish_progress("[决策] 正在思考...")
@@ -505,7 +525,9 @@ class LlmAgentNode(Node):
         if not final_response_text:
             final_response_text = "任务处理完成"
         action_json = json.dumps(executed_actions, ensure_ascii=False)
-        final_conversation_id = self.dify.get_conversation_id() or ""
+        final_conversation_id = (
+            self.dify.get_conversation_id() or "" if self.dify is not None else ""
+        )
         self.publish_latest_response(
             command_id, final_response_text, action_json, final_conversation_id
         )
@@ -514,6 +536,52 @@ class LlmAgentNode(Node):
         self.get_logger().info(
             f"[INPUT] ═══ 指令#{command_id}处理完成, "
             f"反馈轮次≤{max_rounds}, 总耗时: {t_total:.2f}s ═══"
+        )
+
+    def process_local_command(self, command_id: int, user_text: str):
+        """离线解析并执行固定指令，失败时不继续执行后续动作。"""
+        t_start = time.time()
+        try:
+            actions = self.local_parser.parse(user_text)
+        except ValueError as error:
+            self.get_logger().warn(f"[LOCAL] {error}")
+            self.publish_latest_response(command_id, str(error), "[]", "")
+            return
+
+        if self.should_interrupt():
+            return
+
+        self.clear_pending_action_feedback()
+        self.set_terminal_action_result_text("")
+        self.publish_progress(f"[本地] 已识别 {len(actions)} 个动作，无需联网")
+        self.publish_decision_plan(actions)
+
+        if not self.prepare_camera_for_actions(actions):
+            self.publish_latest_response(
+                command_id, "摄像头复位失败，任务已停止", "[]", ""
+            )
+            return
+
+        executed_actions = []
+        success = True
+        for action in actions:
+            batch_success = self.execute_action_batch([action], executed_actions)
+            if batch_success is None:
+                return
+            if not batch_success:
+                success = False
+                self.execute_stop(recenter_camera=False)
+                break
+
+        if self.should_interrupt():
+            return
+
+        response_text = "本地指令执行完成" if success else "动作执行失败，已停止后续动作"
+        action_json = json.dumps(executed_actions, ensure_ascii=False)
+        self.publish_latest_response(command_id, response_text, action_json, "")
+        self.get_logger().info(
+            f"[LOCAL] 指令#{command_id}处理完成，"
+            f"结果={'成功' if success else '失败'}，总耗时: {time.time() - t_start:.2f}s"
         )
 
     def image_callback(self, msg: Image):
@@ -1203,7 +1271,8 @@ class LlmAgentNode(Node):
             # finishtask 会话重置在锁内原子完成，避免发布后、重置前新指令读到旧 ID
             state = self._get_command_state()
             if state.reset_conversation_after_response:
-                self.dify.reset_conversation_id()
+                if self.dify is not None:
+                    self.dify.reset_conversation_id()
                 state.reset_conversation_after_response = False
 
     def publish_current_response(
