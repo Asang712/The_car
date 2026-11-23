@@ -75,7 +75,7 @@ class VisualServoController:
         self.detect_confirm_frames = max(
             1, int(servo.get("detect_confirm_frames", 2))
         )
-        self.lost_timeout = float(servo.get("lost_timeout_sec", 1.0))
+        self.lost_timeout = float(servo.get("lost_timeout_sec", 3.0))
         self.search_timeout = float(servo.get("search_timeout_sec", 40.0))
         self.task_timeout = float(servo.get("task_timeout_sec", 90.0))
         self.morph_kernel = int(servo.get("morph_kernel_size", 5))
@@ -95,6 +95,9 @@ class VisualServoController:
         self._last_seq = -1
         self._last_detection = None
         self._last_detection_time = 0.0
+        self._new_frame = False
+        self._detected_in_latest_frame = False
+        self._last_command = (0.0, 0.0)
 
     # ---- 对外动作入口 ---------------------------------------------
 
@@ -116,9 +119,9 @@ class VisualServoController:
         search_dir = 1.0
         confirmed = 0
         arrived_since = None
-        lost_since = None
         start_time = time.monotonic()
         search_start = start_time
+        last_diagnostic_time = start_time
         deadline = start_time + self.task_timeout
         period = 1.0 / max(self.control_rate, 1.0)
 
@@ -132,10 +135,13 @@ class VisualServoController:
                 now = time.monotonic()
                 detection = self._update_detection(ranges)
                 fresh = self._is_fresh(now)
+                new_frame = self._new_frame
+                detected_now = self._detected_in_latest_frame
 
                 if state == STATE_SEARCH:
                     if detection is not None and fresh:
-                        confirmed += 1
+                        if new_frame:
+                            confirmed = confirmed + 1 if detected_now else 0
                         if confirmed >= self.detect_confirm_frames:
                             state = STATE_ALIGN
                             confirmed = 0
@@ -144,8 +150,11 @@ class VisualServoController:
                             continue
                         self._publish(0.0, 0.0)
                     else:
-                        confirmed = 0
-                        self._publish(0.0, self.search_angular_speed * search_dir)
+                        if new_frame:
+                            confirmed = 0
+                        self._publish(
+                            0.0, self.search_angular_speed * search_dir
+                        )
 
                     if now - search_start > self.search_timeout:
                         self.node.get_logger().warn("[SERVO] 搜索超时，未发现目标")
@@ -153,19 +162,17 @@ class VisualServoController:
                         return False
 
                 elif state == STATE_ALIGN:
-                    if detection is None or not fresh:
-                        if lost_since is None:
-                            lost_since = now
-                        elif now - lost_since > self.lost_timeout:
-                            self.node.get_logger().info("[SERVO] 目标丢失，重新搜索")
-                            state = STATE_SEARCH
-                            search_dir = -search_dir
-                            search_start = now
-                            lost_since = None
-                            confirmed = 0
+                    if not fresh:
+                        self.node.get_logger().info("[SERVO] 目标丢失，重新搜索")
+                        state = STATE_SEARCH
+                        search_dir = -search_dir
+                        search_start = now
+                        confirmed = 0
+                        self._publish(0.0, 0.0)
+                    elif not detected_now:
+                        # 保留目标位置以容忍短时漏检，但车体先停下等待新检测。
                         self._publish(0.0, 0.0)
                     else:
-                        lost_since = None
                         cx, _cy, _radius = detection
                         error = cx - self._frame_width() * 0.5
                         if abs(error) <= self.align_deadband_px:
@@ -181,19 +188,18 @@ class VisualServoController:
                         self._publish(0.0, angular)
 
                 elif state == STATE_APPROACH:
-                    if detection is None or not fresh:
-                        if lost_since is None:
-                            lost_since = now
-                        elif now - lost_since > self.lost_timeout:
-                            self.node.get_logger().info("[SERVO] 靠近中目标丢失，重新搜索")
-                            state = STATE_SEARCH
-                            search_dir = -search_dir
-                            search_start = now
-                            lost_since = None
-                            confirmed = 0
+                    if not fresh:
+                        self.node.get_logger().info("[SERVO] 靠近中目标丢失，重新搜索")
+                        state = STATE_SEARCH
+                        search_dir = -search_dir
+                        search_start = now
+                        confirmed = 0
+                        arrived_since = None
+                        self._publish(0.0, 0.0)
+                    elif not detected_now:
+                        arrived_since = None
                         self._publish(0.0, 0.0)
                     else:
-                        lost_since = None
                         cx, _cy, radius = detection
                         error = cx - self._frame_width() * 0.5
                         angular = clamp(
@@ -230,6 +236,27 @@ class VisualServoController:
                     )
                     return True
 
+                if now - last_diagnostic_time >= 2.0:
+                    if detection is None:
+                        cx_text = "-"
+                        radius_text = "-"
+                    else:
+                        cx_text = f"{detection[0]:.1f}"
+                        radius_text = f"{detection[2]:.1f}"
+                    age = (
+                        now - self._last_detection_time
+                        if self._last_detection_time > 0.0
+                        else -1.0
+                    )
+                    self.node.get_logger().info(
+                        f"[SERVO][DIAG] state={state}, seq={self._last_seq}, "
+                        f"detected={detected_now}, cx={cx_text}, "
+                        f"radius={radius_text}, age={age:.2f}s, "
+                        f"cmd=({self._last_command[0]:.3f}, "
+                        f"{self._last_command[1]:.3f})"
+                    )
+                    last_diagnostic_time = now
+
                 time.sleep(period)
 
             self.node.get_logger().warn("[SERVO] 任务超时，未能在限定时间内到位")
@@ -241,24 +268,37 @@ class VisualServoController:
     # ---- 检测 -----------------------------------------------------
 
     def _update_detection(self, ranges):
-        """在最新一帧上做颜色检测；图像未更新时复用上次结果。"""
+        """检测新帧；短时漏检或帧间等待时保留上次成功结果。"""
+        self._new_frame = False
         frame, seq = self._latest_frame()
         if frame is None:
-            self._last_detection = None
-            self._last_detection_time = 0.0
-            return None
+            self._detected_in_latest_frame = False
+            return (
+                self._last_detection
+                if self._is_fresh(time.monotonic())
+                else None
+            )
         if seq == self._last_seq:
-            return self._last_detection if self._is_fresh(time.monotonic()) else None
-        self._last_seq = seq
+            return (
+                self._last_detection
+                if self._is_fresh(time.monotonic())
+                else None
+            )
 
+        self._new_frame = True
+        self._last_seq = seq
         detection = self._detect_blob(frame, ranges)
+        self._detected_in_latest_frame = detection is not None
         if detection is not None:
             self._last_detection = detection
             self._last_detection_time = time.monotonic()
-        else:
-            self._last_detection = None
-            self._last_detection_time = 0.0
-        return detection
+
+        # 单次漏检不清空历史目标；超时后由 _is_fresh 判丢失。
+        return (
+            self._last_detection
+            if self._is_fresh(time.monotonic())
+            else None
+        )
 
     def _latest_frame(self):
         lock = getattr(self.node, "latest_image_lock", None)
@@ -335,7 +375,14 @@ class VisualServoController:
         twist = Twist()
         twist.linear.x = float(linear_x)
         twist.angular.z = float(angular_z)
+        self._last_command = (twist.linear.x, twist.angular.z)
+        started = time.monotonic()
         self.cmd_vel_pub.publish(twist)
+        elapsed = time.monotonic() - started
+        if elapsed > 0.5:
+            self.node.get_logger().warn(
+                f"[SERVO] cmd_vel发布耗时异常: {elapsed:.3f}s"
+            )
 
     def _stop(self):
         self._publish(0.0, 0.0)

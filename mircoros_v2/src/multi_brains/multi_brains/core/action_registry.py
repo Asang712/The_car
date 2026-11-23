@@ -72,6 +72,12 @@ def describe_action(action: str) -> str:
         "move_forward": lambda: (
             f"前进(速度{args[0]}，{args[1]}秒)" if len(args) >= 2 else "前进"
         ),
+        "move_forward_distance": lambda: (
+            f"前进{args[0]}米" if args else "按里程计前进"
+        ),
+        "move_backward_distance": lambda: (
+            f"后退{args[0]}米" if args else "按里程计后退"
+        ),
         "move_backward": lambda: (
             f"后退(速度{args[0]}，{args[1]}秒)" if len(args) >= 2 else "后退"
         ),

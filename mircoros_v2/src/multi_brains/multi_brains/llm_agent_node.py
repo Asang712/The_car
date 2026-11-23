@@ -312,6 +312,10 @@ class LlmAgentNode(Node):
             "track_kcf": self.kcf.execute_track_kcf,
             "seewhat": self.execute_seewhat,
             "move_forward": self.motion.execute_move_forward,
+            "move_forward_distance": self.motion.execute_move_forward_distance,
+            "move_backward_distance": (
+                self.motion.execute_move_backward_distance
+            ),
             "find_object": self.visual_servo.execute_find_object,
             "move_backward": self.motion.execute_move_backward,
             "turn_left": self.motion.execute_turn_left,
@@ -1302,9 +1306,10 @@ class LlmAgentNode(Node):
 
 
 def main(args=None):
+    cv2.setNumThreads(1)
     rclpy.init(args=args)
     node = LlmAgentNode()
-    executor = MultiThreadedExecutor()
+    executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
 
     try:

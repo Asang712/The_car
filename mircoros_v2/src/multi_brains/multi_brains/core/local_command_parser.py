@@ -111,6 +111,7 @@ class LocalCommandParser:
         self.linear_speed = float(motion.get("default_linear_speed", 0.2))
         self.angular_speed = float(motion.get("default_angular_speed", 0.6))
         self.max_duration = float(motion.get("max_duration_sec", 120.0))
+        self.max_distance = float(motion.get("max_distance_m", 5.0))
         self.max_turn_angle = float(motion.get("max_turn_angle_deg", 720.0))
         self._last_actions = []
         self._history_lock = threading.Lock()
@@ -181,20 +182,25 @@ class LocalCommandParser:
         if not match:
             return None
 
-        action_name = "move_forward" if match.group("direction") == "前" else "move_backward"
+        is_forward = match.group("direction") == "前"
+        action_name = "move_forward" if is_forward else "move_backward"
         value_text = match.group("value")
         unit = match.group("unit")
         if value_text is None:
-            duration = 1.0
-        else:
-            value = parse_number(value_text)
-            if unit in ("秒", "s"):
-                duration = value
-            else:
-                distance_m = value / 100.0 if unit in ("厘米", "cm") else value
-                duration = distance_m / self.linear_speed
-        self._validate_duration(duration)
-        return f"{action_name}({format_number(duration)})"
+            self._validate_duration(1.0)
+            return f"{action_name}(1)"
+
+        value = parse_number(value_text)
+        if unit in ("秒", "s"):
+            self._validate_duration(value)
+            return f"{action_name}({format_number(value)})"
+
+        distance_m = value / 100.0 if unit in ("厘米", "cm") else value
+        self._validate_distance(distance_m)
+        distance_action = (
+            "move_forward_distance" if is_forward else "move_backward_distance"
+        )
+        return f"{distance_action}({format_number(distance_m)})"
 
     def _parse_turn(self, command: str):
         match = re.fullmatch(
@@ -215,6 +221,14 @@ class LocalCommandParser:
         self._validate_duration(duration)
         action_name = "turn_left" if match.group("direction") == "左" else "turn_right"
         return f"{action_name}({format_number(duration)})"
+
+    def _validate_distance(self, distance: float):
+        if not math.isfinite(distance) or distance <= 0.0:
+            raise ValueError("运动距离必须大于0")
+        if distance > self.max_distance:
+            raise ValueError(
+                f"运动距离超过安全上限{format_number(self.max_distance)}米"
+            )
 
     def _validate_duration(self, duration: float):
         if not math.isfinite(duration) or duration <= 0.0:
