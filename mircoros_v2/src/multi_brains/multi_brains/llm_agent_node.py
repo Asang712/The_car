@@ -317,6 +317,7 @@ class LlmAgentNode(Node):
                 self.motion.execute_move_backward_distance
             ),
             "find_object": self.visual_servo.execute_find_object,
+            "push_object": self.motion.execute_push,
             "move_backward": self.motion.execute_move_backward,
             "turn_left": self.motion.execute_turn_left,
             "turn_right": self.motion.execute_turn_right,

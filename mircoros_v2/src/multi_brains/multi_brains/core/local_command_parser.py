@@ -60,7 +60,10 @@ STOP_COMMANDS = {
     "别动了",
     "stop",
 }
-SUPPORTED_EXAMPLES = "前进1米、后退0.5米、左转90度、停止、重复上一次指令、找红色物体"
+PUSH_COMMANDS = {"推一下", "碰一下", "顶一下"}
+SUPPORTED_EXAMPLES = (
+    "前进1米、后退0.5米、左转90度、停止、重复上一次指令、找红色物体、推一下"
+)
 
 
 def _parse_chinese_integer(text: str) -> float:
@@ -136,7 +139,7 @@ class LocalCommandParser:
             segment
             for segment in re.split(
                 r"(?:然后|接着|之后|随后|，|,|；|;|\n|"
-                r"再(?=(?:向|往)?(?:前|后|左|右)|找|寻找|停止))",
+                r"再(?=(?:向|往)?(?:前|后|左|右)|找|寻找|停止|推|碰|顶))",
                 normalized,
             )
             if segment
@@ -156,6 +159,9 @@ class LocalCommandParser:
         command = re.sub(r"^(?:立即|马上|立刻|现在)", "", segment)
         if command in STOP_COMMANDS:
             return ["stop()"]
+
+        if command in PUSH_COMMANDS:
+            return ["push_object()"]
 
         if "找" in command or "搜索" in command:
             for keyword, color in COLOR_KEYWORDS:

@@ -70,10 +70,12 @@ class VisualServoController:
         self.max_angular_speed = float(servo.get("max_angular_speed", 0.5))
         self.min_target_area = float(servo.get("min_target_area", 300.0))
         self.min_target_radius = float(servo.get("min_target_radius", 8.0))
-        self.target_radius_px = float(servo.get("target_radius_px", 180.0))
+        self.target_radius_px = float(servo.get("target_radius_px", 210.0))
         self.approach_kp = float(servo.get("approach_kp", 0.004))
         self.max_linear_speed = float(servo.get("max_linear_speed", 0.12))
-        self.arrive_tolerance_px = float(servo.get("arrive_tolerance_px", 20.0))
+        self.arrive_tolerance_px = float(servo.get("arrive_tolerance_px", 15.0))
+        # 目标接近占满画面时停止前进，避免目标被画面裁掉后半径不再增长
+        self.frame_fill_ratio = float(servo.get("frame_fill_ratio", 0.45))
         self.detect_confirm_frames = max(
             1, int(servo.get("detect_confirm_frames", 2))
         )
@@ -151,6 +153,7 @@ class VisualServoController:
         self._last_detection = None
         self._last_detection_time = 0.0
         self._last_seq = -1
+        self._frame_shape = (640, 480)
         self._new_frame = False
         self._detected_in_latest_frame = False
         self._last_pulse = (0.0, 0.0, 0.0)
@@ -255,7 +258,13 @@ class VisualServoController:
                         in_range = (
                             abs(radius_error) <= self.arrive_tolerance_px
                         )
-                        if in_range and centered:
+                        # 半径已接近画面短边的 45%：再前进目标就会被裁切，
+                        # 测出的半径不再增长，必须当作到位处理。
+                        fill_limit = self.frame_fill_ratio * min(
+                            self._frame_shape
+                        )
+                        saturated = radius >= fill_limit
+                        if (in_range or saturated) and centered:
                             if arrived_since is None:
                                 arrived_since = now
                             elif now - arrived_since > 0.5:
@@ -265,6 +274,8 @@ class VisualServoController:
                             arrived_since = None
 
                         if abs(error) > 2.0 * self.align_deadband_px:
+                            linear = 0.0
+                        elif saturated:
                             linear = 0.0
                         else:
                             linear = clamp(
@@ -337,6 +348,7 @@ class VisualServoController:
 
         self._new_frame = True
         self._last_seq = seq
+        self._frame_shape = frame.shape[:2]
         detection = self._detect_blob(frame, ranges)
         if detection is not None:
             detection = self._accept_detection(detection, time.monotonic())

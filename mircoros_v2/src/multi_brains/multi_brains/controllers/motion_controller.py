@@ -76,6 +76,14 @@ class MotionController:
         self.no_progress_timeout = float(
             motion_config.get("distance_no_progress_timeout_sec", 4.0)
         )
+        push_config = (config or {}).get("PUSH", {})
+        self.push_enabled = bool(push_config.get("enabled", True))
+        self.push_distance = float(push_config.get("distance_m", 0.10))
+        self.push_speed = float(push_config.get("speed", 0.10))
+        self.push_stall_timeout = float(
+            push_config.get("stall_timeout_sec", 0.6)
+        )
+        self.push_timeout = float(push_config.get("timeout_sec", 5.0))
 
         self._odom_lock = threading.Lock()
         self._odom_x = 0.0
@@ -137,8 +145,33 @@ class MotionController:
         """按 ``/odom_raw`` 的位移后退指定米数。"""
         return self._execute_distance(distance, speed, -1.0, "后退")
 
+    def execute_push(self, distance: str = "", speed: str = "") -> bool:
+        """低速向前推进，走完设定距离或顶住目标即视为成功。
+
+        没有力/碰撞传感器，用“已发速度但里程计无位移”作为顶住的判据。
+        """
+        if not self.push_enabled:
+            self.node.get_logger().warn("[MOTION] 推动作未启用")
+            return False
+        return self._execute_distance(
+            str(self.push_distance) if distance in ("", None) else distance,
+            str(self.push_speed) if speed in ("", None) else speed,
+            1.0,
+            "推进",
+            stall_timeout=self.push_stall_timeout,
+            stall_is_success=True,
+            timeout=self.push_timeout,
+        )
+
     def _execute_distance(
-        self, distance: str, speed: str, direction: float, label: str
+        self,
+        distance: str,
+        speed: str,
+        direction: float,
+        label: str,
+        stall_timeout=None,
+        stall_is_success=False,
+        timeout=None,
     ) -> bool:
         try:
             target = parse_positive_float(
@@ -176,7 +209,13 @@ class MotionController:
             start_x, start_y, _ = initial
             start_time = time.monotonic()
             deadline = start_time + min(
-                self.distance_timeout, self.max_duration
+                timeout if timeout is not None else self.distance_timeout,
+                self.max_duration,
+            )
+            stall_limit = (
+                self.no_progress_timeout
+                if stall_timeout is None
+                else stall_timeout
             )
             last_progress_time = start_time
             best_distance = 0.0
@@ -218,9 +257,15 @@ class MotionController:
                 if measured_distance > best_distance + 0.005:
                     best_distance = measured_distance
                     last_progress_time = now
-                elif now - last_progress_time > self.no_progress_timeout:
+                elif now - last_progress_time > stall_limit:
+                    if stall_is_success:
+                        self.node.get_logger().info(
+                            f"[MOTION] 距离{label}已顶住目标: "
+                            f"odom={measured_distance:.3f}m"
+                        )
+                        return True
                     self.node.get_logger().error(
-                        f"[MOTION] {self.no_progress_timeout:.1f}s内无明显位移，"
+                        f"[MOTION] {stall_limit:.1f}s内无明显位移，"
                         f"停止运动: odom={measured_distance:.3f}m"
                     )
                     return False
