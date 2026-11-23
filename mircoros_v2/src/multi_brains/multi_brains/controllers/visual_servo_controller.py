@@ -16,6 +16,7 @@
 import math
 import threading
 import time
+from collections import deque
 
 import cv2
 import numpy as np
@@ -69,10 +70,10 @@ class VisualServoController:
         self.max_angular_speed = float(servo.get("max_angular_speed", 0.5))
         self.min_target_area = float(servo.get("min_target_area", 300.0))
         self.min_target_radius = float(servo.get("min_target_radius", 8.0))
-        self.target_radius_px = float(servo.get("target_radius_px", 70.0))
+        self.target_radius_px = float(servo.get("target_radius_px", 180.0))
         self.approach_kp = float(servo.get("approach_kp", 0.004))
         self.max_linear_speed = float(servo.get("max_linear_speed", 0.12))
-        self.arrive_tolerance_px = float(servo.get("arrive_tolerance_px", 12.0))
+        self.arrive_tolerance_px = float(servo.get("arrive_tolerance_px", 20.0))
         self.detect_confirm_frames = max(
             1, int(servo.get("detect_confirm_frames", 2))
         )
@@ -84,13 +85,26 @@ class VisualServoController:
         self.search_step_rad = math.radians(
             float(servo.get("search_step_deg", 15.0))
         )
-        self.align_pulse_sec = float(servo.get("align_pulse_sec", 0.2))
-        self.approach_pulse_sec = float(servo.get("approach_pulse_sec", 0.2))
+        self.align_pulse_sec = float(servo.get("align_pulse_sec", 0.4))
+        self.approach_pulse_sec = float(servo.get("approach_pulse_sec", 0.4))
+        # 低于该速度轮子可能不转，脉冲统一抬到有效区间。
+        self.min_linear_speed = float(servo.get("min_linear_speed", 0.1))
+        self.min_angular_speed = float(servo.get("min_angular_speed", 0.25))
         self.pulse_max_sec = float(servo.get("pulse_max_sec", 1.0))
         self.frame_wait_timeout = float(
             servo.get("frame_wait_timeout_sec", 2.5)
         )
         self.watchdog_timeout = float(servo.get("watchdog_timeout_sec", 0.6))
+        # 目标稳定性：半径平滑、跳变过滤、到位需居中
+        self.radius_smooth_frames = max(
+            1, int(servo.get("radius_smooth_frames", 5))
+        )
+        self.target_jump_px = float(servo.get("target_jump_px", 160.0))
+        self.radius_jump_ratio = float(servo.get("radius_jump_ratio", 2.0))
+        self.switch_confirm_frames = max(
+            1, int(servo.get("switch_confirm_frames", 3))
+        )
+        self.arrive_center_px = float(servo.get("arrive_center_px", 60.0))
 
         # 允许在 YAML 里覆盖/扩展颜色范围：
         # colors: {red: [[0,120,70,10,255,255], [170,120,70,180,255,255]]}
@@ -110,6 +124,9 @@ class VisualServoController:
         self._new_frame = False
         self._detected_in_latest_frame = False
         self._last_command = (0.0, 0.0)
+        self._last_pulse = (0.0, 0.0, 0.0)
+        self._radius_window = deque(maxlen=self.radius_smooth_frames)
+        self._switch_hits = 0
         self._cmd_lock = threading.Lock()
         self._last_nonzero_time = 0.0
         self._watchdog_active = False
@@ -136,6 +153,8 @@ class VisualServoController:
         self._last_seq = -1
         self._new_frame = False
         self._detected_in_latest_frame = False
+        self._last_pulse = (0.0, 0.0, 0.0)
+        self._reset_target()
 
         state = STATE_SEARCH
         search_dir = 1.0
@@ -190,6 +209,7 @@ class VisualServoController:
                         search_dir = -search_dir
                         search_start = now
                         confirmed = 0
+                        self._reset_target()
                         self._stop()
                     elif not usable:
                         self._stop()
@@ -216,6 +236,7 @@ class VisualServoController:
                         search_start = now
                         confirmed = 0
                         arrived_since = None
+                        self._reset_target()
                         self._stop()
                     elif not usable:
                         arrived_since = None
@@ -230,7 +251,11 @@ class VisualServoController:
                         )
                         radius_error = self.target_radius_px - radius
 
-                        if abs(radius_error) <= self.arrive_tolerance_px:
+                        centered = abs(error) <= self.arrive_center_px
+                        in_range = (
+                            abs(radius_error) <= self.arrive_tolerance_px
+                        )
+                        if in_range and centered:
                             if arrived_since is None:
                                 arrived_since = now
                             elif now - arrived_since > 0.5:
@@ -275,7 +300,9 @@ class VisualServoController:
                         f"new_frame={new_frame}, detected={detected_now}, "
                         f"cx={cx_text}, radius={radius_text}, age={age:.2f}s, "
                         f"cmd=({self._last_command[0]:.3f}, "
-                        f"{self._last_command[1]:.3f})"
+                        f"{self._last_command[1]:.3f}), "
+                        f"pulse=({self._last_pulse[0]:.2f}, "
+                        f"{self._last_pulse[1]:.2f}, {self._last_pulse[2]:.2f}s)"
                     )
                     last_diagnostic_time = now
 
@@ -311,6 +338,8 @@ class VisualServoController:
         self._new_frame = True
         self._last_seq = seq
         detection = self._detect_blob(frame, ranges)
+        if detection is not None:
+            detection = self._accept_detection(detection, time.monotonic())
         self._detected_in_latest_frame = detection is not None
         if detection is not None:
             self._last_detection = detection
@@ -322,6 +351,39 @@ class VisualServoController:
             if self._is_fresh(time.monotonic())
             else None
         )
+
+    def _accept_detection(self, detection, now):
+        """过滤与上一目标位置/大小差太多的块，并返回半径平滑后的检测。
+
+        画面里常有多个绿色块，直接取最大轮廓会在它们之间来回跳。这里要求
+        新块与上一次目标在 ``target_jump_px`` / ``radius_jump_ratio`` 范围内；
+        连续 ``switch_confirm_frames`` 帧都指向新位置才允许切换目标。
+        """
+        last = self._last_detection
+        if last is not None and self._is_fresh(now):
+            dx = abs(detection[0] - last[0])
+            smaller = max(1.0, min(detection[2], last[2]))
+            ratio = max(detection[2], last[2]) / smaller
+            if dx > self.target_jump_px or ratio > self.radius_jump_ratio:
+                self._switch_hits += 1
+                if self._switch_hits < self.switch_confirm_frames:
+                    return None
+                self._switch_hits = 0
+                self._radius_window.clear()
+            else:
+                self._switch_hits = 0
+        else:
+            self._switch_hits = 0
+
+        self._radius_window.append(detection[2])
+        ordered = sorted(self._radius_window)
+        stable_radius = ordered[len(ordered) // 2]
+        return (detection[0], detection[1], stable_radius)
+
+    def _reset_target(self):
+        """丢失目标或重新开始搜索时，清空平滑窗口与切换计数。"""
+        self._radius_window.clear()
+        self._switch_hits = 0
 
     def _latest_frame(self):
         lock = getattr(self.node, "latest_image_lock", None)
@@ -417,6 +479,11 @@ class VisualServoController:
 
     def _pulse(self, linear_x, angular_z, duration):
         """按 ``duration`` 发一小段速度后立即停车，避免帧间盲走。"""
+        if linear_x != 0.0 and abs(linear_x) < self.min_linear_speed:
+            linear_x = math.copysign(self.min_linear_speed, linear_x)
+        if angular_z != 0.0 and abs(angular_z) < self.min_angular_speed:
+            angular_z = math.copysign(self.min_angular_speed, angular_z)
+        self._last_pulse = (float(linear_x), float(angular_z), float(duration))
         steps = max(1, int(round(duration / 0.05)))
         for _ in range(steps):
             if self.node.should_interrupt():

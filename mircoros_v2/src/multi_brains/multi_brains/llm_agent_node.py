@@ -30,7 +30,7 @@ import cv2
 
 import rclpy
 from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor, ExternalShutdownException
+from rclpy.executors import SingleThreadedExecutor, ExternalShutdownException
 from rclpy.qos import (
     QoSProfile,
     QoSHistoryPolicy,
@@ -1309,7 +1309,10 @@ def main(args=None):
     cv2.setNumThreads(1)
     rclpy.init(args=args)
     node = LlmAgentNode()
-    executor = MultiThreadedExecutor(num_threads=4)
+    # 本机 Jazzy 上 MultiThreadedExecutor 会空转并大量丢消息（实测 odom
+    # 4 秒只收到 4/60 条、CPU 97%），改用单线程执行器；耗时动作都在
+    # worker 线程里执行，不会阻塞回调。
+    executor = SingleThreadedExecutor()
     executor.add_node(node)
 
     try:
