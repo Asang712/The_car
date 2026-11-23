@@ -14,6 +14,7 @@
 """
 
 import math
+import threading
 import time
 
 import cv2
@@ -76,9 +77,20 @@ class VisualServoController:
             1, int(servo.get("detect_confirm_frames", 2))
         )
         self.lost_timeout = float(servo.get("lost_timeout_sec", 3.0))
-        self.search_timeout = float(servo.get("search_timeout_sec", 40.0))
-        self.task_timeout = float(servo.get("task_timeout_sec", 90.0))
+        self.search_timeout = float(servo.get("search_timeout_sec", 90.0))
+        self.task_timeout = float(servo.get("task_timeout_sec", 180.0))
         self.morph_kernel = int(servo.get("morph_kernel_size", 5))
+        # 低帧率保护：每次只按新帧走一小步，步间停车等新画面。
+        self.search_step_rad = math.radians(
+            float(servo.get("search_step_deg", 15.0))
+        )
+        self.align_pulse_sec = float(servo.get("align_pulse_sec", 0.2))
+        self.approach_pulse_sec = float(servo.get("approach_pulse_sec", 0.2))
+        self.pulse_max_sec = float(servo.get("pulse_max_sec", 1.0))
+        self.frame_wait_timeout = float(
+            servo.get("frame_wait_timeout_sec", 2.5)
+        )
+        self.watchdog_timeout = float(servo.get("watchdog_timeout_sec", 0.6))
 
         # 允许在 YAML 里覆盖/扩展颜色范围：
         # colors: {red: [[0,120,70,10,255,255], [170,120,70,180,255,255]]}
@@ -98,6 +110,9 @@ class VisualServoController:
         self._new_frame = False
         self._detected_in_latest_frame = False
         self._last_command = (0.0, 0.0)
+        self._cmd_lock = threading.Lock()
+        self._last_nonzero_time = 0.0
+        self._watchdog_active = False
 
     # ---- 对外动作入口 ---------------------------------------------
 
@@ -115,6 +130,13 @@ class VisualServoController:
         ranges = self.color_ranges[color]
         self.node.get_logger().info(f"[SERVO] 开始寻找目标: {color} (原始输入: {target})")
 
+        # 每次任务从干净状态开始，避免沿用上一条指令的旧检测结果。
+        self._last_detection = None
+        self._last_detection_time = 0.0
+        self._last_seq = -1
+        self._new_frame = False
+        self._detected_in_latest_frame = False
+
         state = STATE_SEARCH
         search_dir = 1.0
         confirmed = 0
@@ -125,6 +147,7 @@ class VisualServoController:
         deadline = start_time + self.task_timeout
         period = 1.0 / max(self.control_rate, 1.0)
 
+        self._start_watchdog()
         try:
             while time.monotonic() < deadline:
                 if self.node.should_interrupt():
@@ -137,24 +160,23 @@ class VisualServoController:
                 fresh = self._is_fresh(now)
                 new_frame = self._new_frame
                 detected_now = self._detected_in_latest_frame
+                # 只有“新帧 + 本帧检测成功”才允许动作，避免按旧坐标盲转。
+                usable = new_frame and detected_now and fresh
 
                 if state == STATE_SEARCH:
-                    if detection is not None and fresh:
-                        if new_frame:
-                            confirmed = confirmed + 1 if detected_now else 0
+                    if usable:
+                        confirmed += 1
+                        self._stop()
                         if confirmed >= self.detect_confirm_frames:
                             state = STATE_ALIGN
                             confirmed = 0
-                            self._stop()
                             self.node.get_logger().info("[SERVO] 发现目标，进入对准")
                             continue
-                        self._publish(0.0, 0.0)
+                    elif new_frame:
+                        confirmed = 0
+                        self._step_search(search_dir)
                     else:
-                        if new_frame:
-                            confirmed = 0
-                        self._publish(
-                            0.0, self.search_angular_speed * search_dir
-                        )
+                        self._stop()
 
                     if now - search_start > self.search_timeout:
                         self.node.get_logger().warn("[SERVO] 搜索超时，未发现目标")
@@ -168,12 +190,11 @@ class VisualServoController:
                         search_dir = -search_dir
                         search_start = now
                         confirmed = 0
-                        self._publish(0.0, 0.0)
-                    elif not detected_now:
-                        # 保留目标位置以容忍短时漏检，但车体先停下等待新检测。
-                        self._publish(0.0, 0.0)
+                        self._stop()
+                    elif not usable:
+                        self._stop()
                     else:
-                        cx, _cy, _radius = detection
+                        cx = detection[0]
                         error = cx - self._frame_width() * 0.5
                         if abs(error) <= self.align_deadband_px:
                             state = STATE_APPROACH
@@ -185,7 +206,7 @@ class VisualServoController:
                             -self.max_angular_speed,
                             self.max_angular_speed,
                         )
-                        self._publish(0.0, angular)
+                        self._pulse(0.0, angular, self.align_pulse_sec)
 
                 elif state == STATE_APPROACH:
                     if not fresh:
@@ -195,10 +216,10 @@ class VisualServoController:
                         search_start = now
                         confirmed = 0
                         arrived_since = None
-                        self._publish(0.0, 0.0)
-                    elif not detected_now:
+                        self._stop()
+                    elif not usable:
                         arrived_since = None
-                        self._publish(0.0, 0.0)
+                        self._stop()
                     else:
                         cx, _cy, radius = detection
                         error = cx - self._frame_width() * 0.5
@@ -226,7 +247,7 @@ class VisualServoController:
                                 -0.05,
                                 self.max_linear_speed,
                             )
-                        self._publish(linear, angular)
+                        self._pulse(linear, angular, self.approach_pulse_sec)
 
                 elif state == STATE_ARRIVED:
                     self._stop()
@@ -236,6 +257,7 @@ class VisualServoController:
                     )
                     return True
 
+                now = time.monotonic()
                 if now - last_diagnostic_time >= 2.0:
                     if detection is None:
                         cx_text = "-"
@@ -250,8 +272,8 @@ class VisualServoController:
                     )
                     self.node.get_logger().info(
                         f"[SERVO][DIAG] state={state}, seq={self._last_seq}, "
-                        f"detected={detected_now}, cx={cx_text}, "
-                        f"radius={radius_text}, age={age:.2f}s, "
+                        f"new_frame={new_frame}, detected={detected_now}, "
+                        f"cx={cx_text}, radius={radius_text}, age={age:.2f}s, "
                         f"cmd=({self._last_command[0]:.3f}, "
                         f"{self._last_command[1]:.3f})"
                     )
@@ -264,6 +286,7 @@ class VisualServoController:
             return False
         finally:
             self._stop()
+            self._stop_watchdog()
 
     # ---- 检测 -----------------------------------------------------
 
@@ -376,8 +399,11 @@ class VisualServoController:
         twist.linear.x = float(linear_x)
         twist.angular.z = float(angular_z)
         self._last_command = (twist.linear.x, twist.angular.z)
+        moving = twist.linear.x != 0.0 or twist.angular.z != 0.0
         started = time.monotonic()
-        self.cmd_vel_pub.publish(twist)
+        with self._cmd_lock:
+            self.cmd_vel_pub.publish(twist)
+            self._last_nonzero_time = time.monotonic() if moving else 0.0
         elapsed = time.monotonic() - started
         if elapsed > 0.5:
             self.node.get_logger().warn(
@@ -386,3 +412,69 @@ class VisualServoController:
 
     def _stop(self):
         self._publish(0.0, 0.0)
+
+    # ---- 低帧率步进 / 安全停车 -------------------------------------
+
+    def _pulse(self, linear_x, angular_z, duration):
+        """按 ``duration`` 发一小段速度后立即停车，避免帧间盲走。"""
+        steps = max(1, int(round(duration / 0.05)))
+        for _ in range(steps):
+            if self.node.should_interrupt():
+                break
+            self._publish(linear_x, angular_z)
+            time.sleep(0.05)
+        self._stop()
+
+    def _step_search(self, direction):
+        """按固定小角度转一步，然后等一帧转完后的新画面。"""
+        seq_before = self._latest_seq()
+        duration = min(
+            self.search_step_rad / max(self.search_angular_speed, 1e-3),
+            self.pulse_max_sec,
+        )
+        self._pulse(0.0, self.search_angular_speed * direction, duration)
+        self._wait_for_newer_frame(seq_before, self.frame_wait_timeout)
+
+    def _latest_seq(self):
+        lock = getattr(self.node, "latest_image_lock", None)
+        if lock is None:
+            return 0
+        with lock:
+            return int(getattr(self.node, "latest_image_seq", 0))
+
+    def _wait_for_newer_frame(self, seq_before, timeout):
+        deadline = time.monotonic() + max(0.0, timeout)
+        while time.monotonic() < deadline:
+            if self.node.should_interrupt():
+                return False
+            if self._latest_seq() > seq_before:
+                return True
+            time.sleep(0.03)
+        return False
+
+    def _start_watchdog(self):
+        self._last_nonzero_time = 0.0
+        self._watchdog_active = True
+        self._watchdog_thread = threading.Thread(
+            target=self._watchdog_loop, name="servo-watchdog", daemon=True
+        )
+        self._watchdog_thread.start()
+
+    def _stop_watchdog(self):
+        self._watchdog_active = False
+
+    def _watchdog_loop(self):
+        """速度指令长时间未更新时强制发零，防止线程卡住后车体持续转圈。"""
+        while self._watchdog_active:
+            time.sleep(0.05)
+            with self._cmd_lock:
+                last = self._last_nonzero_time
+                if last <= 0.0:
+                    continue
+                if time.monotonic() - last <= self.watchdog_timeout:
+                    continue
+                self.cmd_vel_pub.publish(Twist())
+                self._last_nonzero_time = 0.0
+            self.node.get_logger().warn(
+                f"[SERVO] 速度指令超过{self.watchdog_timeout:.1f}s未更新，已自动停车"
+            )
