@@ -56,9 +56,10 @@ def clamp(value, low, high):
 class VisualServoController:
     """基于颜色检测的视觉伺服控制器。"""
 
-    def __init__(self, node, cmd_vel_pub, config=None):
+    def __init__(self, node, cmd_vel_pub, config=None, motion=None):
         self.node = node
         self.cmd_vel_pub = cmd_vel_pub
+        self.motion = motion
         config = config or {}
         servo = config.get("VISION_SERVO", {})
 
@@ -135,11 +136,18 @@ class VisualServoController:
 
     # ---- 对外动作入口 ---------------------------------------------
 
-    def execute_find_object(self, target: str = "red") -> bool:
-        """搜索并靠近指定颜色的目标，到位返回 True。"""
+    def execute_find_object(
+        self, target: str = "red", mode: str = "approach"
+    ) -> bool:
+        """搜索并靠近指定颜色的目标，到位返回 True。
+
+        ``mode="contact"`` 时，视觉到位后继续向前推进，直到顶住目标。
+        """
         if not self.enabled:
             self.node.get_logger().warn("[SERVO] 视觉伺服未启用")
             return False
+
+        contact = str(mode).strip().lower() in ("contact", "push", "触碰")
 
         color = self._resolve_color(target)
         if color is None:
@@ -291,6 +299,16 @@ class VisualServoController:
                         f"[SERVO] 已到达目标 {color}，自行走耗时 "
                         f"{time.monotonic() - start_time:.1f}s"
                     )
+                    if contact:
+                        if self.motion is None:
+                            self.node.get_logger().error(
+                                "[SERVO] 未配置底盘控制器，无法执行接触推进"
+                            )
+                            return False
+                        self.node.get_logger().info(
+                            "[SERVO] 视觉已到位，继续推进直到顶住目标"
+                        )
+                        return self.motion.execute_push_contact()
                     return True
 
                 now = time.monotonic()

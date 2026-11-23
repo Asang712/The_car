@@ -79,11 +79,20 @@ class MotionController:
         push_config = (config or {}).get("PUSH", {})
         self.push_enabled = bool(push_config.get("enabled", True))
         self.push_distance = float(push_config.get("distance_m", 0.10))
-        self.push_speed = float(push_config.get("speed", 0.10))
+        self.push_speed = float(push_config.get("speed", 0.20))
         self.push_stall_timeout = float(
             push_config.get("stall_timeout_sec", 0.6)
         )
         self.push_timeout = float(push_config.get("timeout_sec", 5.0))
+        self.push_contact_distance = float(
+            push_config.get("contact_distance_m", 0.50)
+        )
+        self.push_contact_timeout = float(
+            push_config.get("contact_timeout_sec", 15.0)
+        )
+        self.push_min_progress = float(
+            push_config.get("min_progress_m", 0.03)
+        )
 
         self._odom_lock = threading.Lock()
         self._odom_x = 0.0
@@ -161,6 +170,27 @@ class MotionController:
             stall_timeout=self.push_stall_timeout,
             stall_is_success=True,
             timeout=self.push_timeout,
+            min_progress_for_stall=self.push_min_progress,
+        )
+
+    def execute_push_contact(self) -> bool:
+        """找物后继续向前推进，直到顶住目标或走满接触推进距离。
+
+        与 :meth:`execute_push` 的区别：距离更长（默认 0.5m），且要求至少
+        产生 ``min_progress_m`` 的位移才算“顶住”；完全推不动时判失败。
+        """
+        if not self.push_enabled:
+            self.node.get_logger().warn("[MOTION] 推动作未启用")
+            return False
+        return self._execute_distance(
+            str(self.push_contact_distance),
+            str(self.push_speed),
+            1.0,
+            "接触推进",
+            stall_timeout=self.push_stall_timeout,
+            stall_is_success=True,
+            timeout=self.push_contact_timeout,
+            min_progress_for_stall=self.push_min_progress,
         )
 
     def _execute_distance(
@@ -172,6 +202,7 @@ class MotionController:
         stall_timeout=None,
         stall_is_success=False,
         timeout=None,
+        min_progress_for_stall=0.0,
     ) -> bool:
         try:
             target = parse_positive_float(
@@ -258,12 +289,22 @@ class MotionController:
                     best_distance = measured_distance
                     last_progress_time = now
                 elif now - last_progress_time > stall_limit:
-                    if stall_is_success:
+                    if (
+                        stall_is_success
+                        and measured_distance >= min_progress_for_stall
+                    ):
                         self.node.get_logger().info(
                             f"[MOTION] 距离{label}已顶住目标: "
                             f"odom={measured_distance:.3f}m"
                         )
                         return True
+                    if stall_is_success:
+                        self.node.get_logger().error(
+                            f"[MOTION] 距离{label}推不动: "
+                            f"{stall_limit:.1f}s内仅移动"
+                            f"{measured_distance:.3f}m"
+                        )
+                        return False
                     self.node.get_logger().error(
                         f"[MOTION] {stall_limit:.1f}s内无明显位移，"
                         f"停止运动: odom={measured_distance:.3f}m"

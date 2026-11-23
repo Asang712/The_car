@@ -85,6 +85,7 @@ def describe_action(action: str) -> str:
         "turn_right": lambda: f"右转{args[0]}度" if args else "右转",
         "stop": lambda: "停止运动",
         "push_object": lambda: "低速向前推进触碰目标",
+        "push_contact": lambda: "持续推进直到顶住目标",
         "servo1_move": lambda: f"1号舵机转到{args[0]}度" if args else "移动1号舵机",
         "servo2_move": lambda: f"2号舵机转到{args[0]}度" if args else "移动2号舵机",
         "servo_init": lambda: "云台舵机复位",

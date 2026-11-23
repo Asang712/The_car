@@ -61,8 +61,10 @@ STOP_COMMANDS = {
     "stop",
 }
 PUSH_COMMANDS = {"推一下", "碰一下", "顶一下"}
+CONTACT_PUSH_COMMANDS = {"推上去", "推过去", "推到"}
 SUPPORTED_EXAMPLES = (
-    "前进1米、后退0.5米、左转90度、停止、重复上一次指令、找红色物体、推一下"
+    "前进1米、后退0.5米、左转90度、停止、重复上一次指令、"
+    "找红色物体、推一下、找绿色物体并推上去"
 )
 
 
@@ -151,6 +153,21 @@ class LocalCommandParser:
         for segment in segments:
             actions.extend(self._parse_segment(segment))
 
+        # “找X然后推上去”被拆成两条时合回一条，避免找物失败后仍然盲推。
+        merged = []
+        index = 0
+        while index < len(actions):
+            current = actions[index]
+            following = actions[index + 1] if index + 1 < len(actions) else ""
+            if current.startswith("find_object(") and following == "push_contact()":
+                target = current[len("find_object("):-1]
+                merged.append(f"find_object({target}, contact)")
+                index += 2
+            else:
+                merged.append(current)
+                index += 1
+        actions = merged
+
         with self._history_lock:
             self._last_actions = list(actions)
         return actions
@@ -163,9 +180,17 @@ class LocalCommandParser:
         if command in PUSH_COMMANDS:
             return ["push_object()"]
 
+        if command in CONTACT_PUSH_COMMANDS:
+            return ["push_contact()"]
+
         if "找" in command or "搜索" in command:
+            wants_contact = any(
+                keyword in command for keyword in CONTACT_PUSH_COMMANDS
+            )
             for keyword, color in COLOR_KEYWORDS:
                 if keyword in command:
+                    if wants_contact:
+                        return [f"find_object({color}, contact)"]
                     return [f"find_object({color})"]
             raise ValueError("本地找物需要指定颜色，例如：找红色物体；支持红、橙、黄、绿、蓝、紫")
 

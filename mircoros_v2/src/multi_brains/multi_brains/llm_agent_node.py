@@ -110,7 +110,7 @@ class LlmAgentNode(Node):
         self.ptz = PtzController(self, self.config, self.car_type)
         self.motion = MotionController(self, self.cmd_vel_pub, self.config)
         self.visual_servo = VisualServoController(
-            self, self.cmd_vel_pub, self.config
+            self, self.cmd_vel_pub, self.config, motion=self.motion
         )
         self.navigation = NavigationController(self, self.config)
         self.follow_line_controller = FollowLineController(
@@ -318,6 +318,7 @@ class LlmAgentNode(Node):
             ),
             "find_object": self.visual_servo.execute_find_object,
             "push_object": self.motion.execute_push,
+            "push_contact": self.motion.execute_push_contact,
             "move_backward": self.motion.execute_move_backward,
             "turn_left": self.motion.execute_turn_left,
             "turn_right": self.motion.execute_turn_right,
