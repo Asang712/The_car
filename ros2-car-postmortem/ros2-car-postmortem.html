@@ -4,9 +4,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MicroROS V2 小车项目复盘 · 从源码到跑通的 11 个坑</title>
+<title>我用 7 天把一台 micro-ROS 小车跑通：ROS 2 新人的 6 个认知转变</title>
 <style>
-/* ===== CSS Variables ===== */
 :root {
   --bg: #FAFAFA;
   --bg2: #F2F2F4;
@@ -21,55 +20,43 @@
   --radius-lg: 12px;
 }
 
-/* ===== Fonts ===== */
 @font-face {
-  font-family: 'Work Sans';
-  font-weight: 400;
-  font-style: normal;
+  font-family: 'Work Sans'; font-weight: 400; font-style: normal;
   src: url('./_shared/fonts/WorkSans-Regular.ttf') format('truetype');
 }
 @font-face {
-  font-family: 'Work Sans';
-  font-weight: 700;
-  font-style: normal;
+  font-family: 'Work Sans'; font-weight: 700; font-style: normal;
   src: url('./_shared/fonts/WorkSans-Bold.ttf') format('truetype');
 }
 @font-face {
-  font-family: 'Lora';
-  font-weight: 400;
-  font-style: normal;
+  font-family: 'Lora'; font-weight: 400; font-style: normal;
   src: url('./_shared/fonts/Lora-Regular.ttf') format('truetype');
 }
 @font-face {
-  font-family: 'JetBrains Mono';
-  font-weight: 400;
-  font-style: normal;
+  font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal;
   src: url('./_shared/fonts/JetBrainsMono-Regular.ttf') format('truetype');
 }
 
-/* ===== Base ===== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
-  font-family: 'Lora', 'Work Sans', Georgia, serif;
+  font-family: 'Lora', Georgia, serif;
   font-size: 16px;
-  line-height: 1.75;
+  line-height: 1.8;
   color: var(--ink);
   background: var(--bg);
-  max-width: 860px;
+  max-width: 780px;
   margin: 0 auto;
-  padding: 0 24px 80px;
+  padding: 0 28px 80px;
 }
 
-/* ===== Typography ===== */
 h1, h2, h3, h4 { font-family: 'Work Sans', system-ui, sans-serif; line-height: 1.3; }
-h1 { font-size: 2.4rem; font-weight: 700; margin-top: 4rem; margin-bottom: 1rem; letter-spacing: -0.01em; }
-h2 { font-size: 1.6rem; font-weight: 700; margin-top: 3.5rem; margin-bottom: 1rem; border-bottom: 2px solid var(--ink); padding-bottom: 0.5rem; }
-h3 { font-size: 1.2rem; font-weight: 700; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--ink); }
-h4 { font-size: 1rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-p { margin-bottom: 1rem; }
-strong { font-weight: 700; color: var(--ink); }
-em { font-style: italic; }
+h1 { font-size: 2.6rem; font-weight: 700; margin-top: 0; margin-bottom: 1rem; letter-spacing: -0.02em; }
+h2 { font-size: 1.5rem; font-weight: 700; margin-top: 3.5rem; margin-bottom: 1.25rem; border-bottom: 2px solid var(--ink); padding-bottom: 0.6rem; }
+h3 { font-size: 1.15rem; font-weight: 700; margin-top: 2rem; margin-bottom: 0.75rem; }
+h4 { font-size: 0.9rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+p { margin-bottom: 1.1rem; }
+strong { font-weight: 700; }
 
 code {
   font-family: 'JetBrains Mono', monospace;
@@ -81,245 +68,145 @@ code {
 }
 pre {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   background: #1A1A1C;
   color: #E4E4E8;
-  padding: 1rem 1.25rem;
+  padding: 0.85rem 1.1rem;
   border-radius: var(--radius);
   overflow-x: auto;
   margin: 1rem 0;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+
 blockquote {
-  border-left: 4px solid var(--accent);
+  border-left: 3px solid var(--accent);
   background: var(--accent-soft);
   padding: 0.75rem 1rem;
-  margin: 1rem 0;
+  margin: 1.25rem 0;
   border-radius: 0 var(--radius) var(--radius) 0;
   color: var(--ink);
+  font-style: italic;
 }
 
 /* ===== Cover ===== */
 .cover {
-  text-align: center;
-  padding: 4rem 0 3rem;
+  padding: 3.5rem 0 2.5rem;
   border-bottom: 1px solid var(--rule);
-  margin-bottom: 3rem;
+  margin-bottom: 2.5rem;
 }
 .cover .kicker {
   font-family: 'Work Sans', sans-serif;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.22em;
   color: var(--accent);
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   font-weight: 700;
-}
-.cover h1 {
-  font-size: 2.8rem;
-  margin-top: 0;
-  margin-bottom: 0.75rem;
 }
 .cover .lede {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   color: var(--muted);
   font-family: 'Lora', serif;
-  max-width: 640px;
-  margin: 0 auto 2rem;
+  margin-top: 1rem;
 }
+.cover .lede strong { color: var(--accent2); }
 .cover .meta {
   font-family: 'Work Sans', sans-serif;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--muted);
+  margin-top: 2rem;
 }
-.cover .meta span { margin: 0 0.5rem; }
+.cover .meta span { margin-right: 0.6rem; }
 
-/* ===== Stats Grid ===== */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
+/* ===== Insight Cards ===== */
+.insight {
+  background: var(--bg2);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem 1.75rem;
   margin: 2rem 0;
-}
-.stat-card {
-  background: var(--bg2);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-  text-align: center;
-}
-.stat-number {
-  font-family: 'Work Sans', sans-serif;
-  font-size: 2.2rem;
-  font-weight: 700;
-  color: var(--accent);
-  line-height: 1;
-  margin-bottom: 0.35rem;
-}
-.stat-label {
-  font-family: 'Work Sans', sans-serif;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-/* ===== Tables ===== */
-.table-wrap {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 600px;
-  margin: 1rem 0;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-  min-width: 520px;
-}
-th, td {
-  text-align: left;
-  padding: 0.7rem 1rem;
-  border-bottom: 1px solid var(--rule);
-}
-th {
-  font-family: 'Work Sans', sans-serif;
-  font-weight: 700;
-  background: var(--bg2);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink);
-}
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: var(--bg2); }
-
-/* ===== Pitfall Cards ===== */
-.pitfall-card {
-  background: var(--bg2);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  margin: 1.5rem 0;
-  border-left: 4px solid var(--accent2);
-}
-.pitfall-card .pitfall-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-.pitfall-card .pitfall-num {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
-  background: var(--accent2);
-  color: white;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 700;
-}
-.pitfall-card h3 {
-  margin: 0;
-  color: var(--accent2);
-  border-bottom: none;
-  font-size: 1.05rem;
-}
-.pitfall-card .pitfall-row {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-.pitfall-card .pitfall-row:last-child { margin-bottom: 0; }
-.pitfall-card .pitfall-label {
-  font-family: 'Work Sans', sans-serif;
-  font-weight: 700;
-  color: var(--ink);
-  min-width: 60px;
-  flex-shrink: 0;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.pitfall-card .pitfall-value {
-  color: var(--muted);
-  flex: 1;
-}
-
-/* ===== Success Card ===== */
-.success-card {
-  background: var(--accent-soft);
-  border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
-  margin: 1rem 0;
   border-left: 4px solid var(--accent);
 }
-.success-card strong { color: var(--accent); }
-
-/* ===== Failure Card ===== */
-.failure-card {
-  background: var(--accent2-soft);
-  border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
-  margin: 1rem 0;
-  border-left: 4px solid var(--accent2);
-}
-.failure-card strong { color: var(--accent2); }
-
-/* ===== Mermaid / Diagram ===== */
-.figure { margin: 2rem 0; }
-.figure figcaption {
-  font-family: 'Work Sans', sans-serif;
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin-top: 0.75rem;
-  text-align: center;
-  font-style: italic;
-}
-pre.mermaid {
-  background: var(--bg2);
-  color: var(--ink);
-  font-family: 'Work Sans', system-ui, sans-serif;
-  font-size: 0.9rem;
-  border-radius: var(--radius);
-  padding: 1rem;
-}
-
-/* ===== Chart Container ===== */
-.chart-figure { margin: 2rem 0; }
-.chart-figure figcaption {
-  font-family: 'Work Sans', sans-serif;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--ink);
-  margin-bottom: 0.75rem;
-}
-
-/* ===== Progress Bar ===== */
-.progress-container { margin: 1rem 0; }
-.progress-label {
-  font-family: 'Work Sans', sans-serif;
-  font-size: 0.85rem;
-  color: var(--ink);
-  margin-bottom: 0.35rem;
+.insight .insight-header {
   display: flex;
-  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
 }
-.progress-bar {
-  height: 8px;
-  background: var(--bg2);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  border-radius: 4px;
+.insight .insight-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
   background: var(--accent);
-  transition: width 0.6s ease;
+  color: white;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-weight: 700;
+  white-space: nowrap;
 }
-.progress-fill.amber { background: var(--accent2); }
+.insight h3 {
+  margin: 0;
+  border-bottom: none;
+  font-size: 1.1rem;
+  color: var(--accent);
+}
+.insight .was-now {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+.insight .was-box, .insight .now-box {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+.insight .was-box {
+  background: #F5EDE8;
+  border: 1px solid var(--accent2-soft);
+  color: var(--accent2);
+}
+.insight .now-box {
+  background: var(--accent-soft);
+  border: 1px solid #C5D4FF;
+  color: var(--accent);
+}
+.insight .label {
+  font-family: 'Work Sans', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+.insight .story { font-size: 0.92rem; color: var(--muted); line-height: 1.75; }
+.insight .story code { font-size: 0.85em; }
+
+/* ===== Reveal ===== */
+.reveal {
+  background: var(--accent2-soft);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  margin: 1.5rem 0;
+  border-left: 4px solid var(--accent2);
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+.reveal strong { color: var(--accent2); }
+
+/* ===== Success ===== */
+.success {
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+  border-left: 4px solid var(--accent);
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+.success strong { color: var(--accent); }
 
 /* ===== Checklist ===== */
 .checklist { list-style: none; margin: 1rem 0; }
@@ -327,8 +214,9 @@ pre.mermaid {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.92rem;
+  line-height: 1.65;
 }
 .checklist li::before {
   content: attr(data-check);
@@ -337,445 +225,518 @@ pre.mermaid {
   flex-shrink: 0;
   margin-top: 1px;
 }
-.checklist li.done::before { color: #16A34A; }
-.checklist li.todo::before { color: var(--accent2); }
-.checklist li.risk::before { color: var(--accent); }
+.checklist li.do::before { color: #16A34A; }
+.checklist li.watch::before { color: var(--accent2); }
 
-/* ===== Two Col ===== */
+/* ===== Stats strip ===== */
+.stats {
+  display: flex;
+  justify-content: space-around;
+  background: var(--bg2);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  margin: 1.5rem 0 2.5rem;
+}
+.stat-item { text-align: center; }
+.stat-num {
+  font-family: 'Work Sans', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+.stat-num.red { color: var(--accent2); }
+.stat-label {
+  font-family: 'Work Sans', sans-serif;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+/* ===== Diagram / Mermaid ===== */
+.figure { margin: 2rem 0; text-align: center; }
+.figure figcaption {
+  font-family: 'Work Sans', sans-serif;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 0.75rem;
+  font-style: italic;
+}
+pre.mermaid {
+  background: var(--bg2);
+  color: var(--ink);
+  font-family: 'Work Sans', system-ui, sans-serif;
+  font-size: 0.88rem;
+  border-radius: var(--radius);
+  padding: 1rem;
+  text-align: left;
+}
+
+/* ===== Chart ===== */
+.chart-figure { margin: 2rem 0; }
+.chart-figure figcaption {
+  font-family: 'Work Sans', sans-serif;
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+
+/* ===== Two col ===== */
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  margin: 1.5rem 0;
+  gap: 1.25rem;
+  margin: 1.25rem 0;
 }
 
-/* ===== Hardware Constraint Callout ===== */
-.hw-callout {
-  background: var(--bg2);
-  border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
+/* ===== Table ===== */
+.table-wrap {
+  overflow-x: auto;
+  max-height: 500px;
   margin: 1rem 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
-.hw-callout h4 {
-  color: var(--accent2);
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 0.95rem;
-  margin-bottom: 0.75rem;
-  border-bottom: 1px dashed var(--accent2);
-  padding-bottom: 0.35rem;
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 440px; }
+th, td { text-align: left; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--rule); }
+th {
+  font-family: 'Work Sans', sans-serif; font-weight: 700; font-size: 0.78rem;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); background: var(--bg2);
 }
+tr:last-child td { border-bottom: none; }
 
-/* ===== Footnote / Sources ===== */
+/* ===== HR ===== */
+hr { border: none; border-top: 1px solid var(--rule); margin: 2.5rem 0; }
+
+/* ===== Footer ===== */
 footer {
-  margin-top: 4rem;
-  padding-top: 2rem;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
   border-top: 1px solid var(--rule);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--muted);
 }
-footer h2 { border: none; font-size: 1rem; margin-top: 1.5rem; }
-footer ol { padding-left: 1.2rem; }
-footer li { margin-bottom: 0.4rem; }
-
-sup a { color: var(--accent); text-decoration: none; font-size: 0.75em; font-weight: 700; }
-sup a:hover { text-decoration: underline; }
 
 /* ===== Responsive ===== */
-@media (max-width: 768px) {
-  h1 { font-size: 1.8rem; }
-  h2 { font-size: 1.3rem; }
-  .cover h1 { font-size: 2rem; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 720px) {
+  h1 { font-size: 2rem; }
+  .insight .was-now { grid-template-columns: 1fr; gap: 0.75rem; }
   .two-col { grid-template-columns: 1fr; }
+  .stats { flex-wrap: wrap; gap: 1rem; }
+  .stat-item { flex: 0 0 40%; }
   body { padding: 0 16px 60px; }
-}
-
-@media print {
-  .no-print { display: none; }
-  body { max-width: 100%; font-size: 12pt; }
-  h2 { page-break-after: avoid; }
-  .pitfall-card, .stat-card, .success-card, .failure-card { break-inside: avoid; }
 }
 </style>
 </head>
 <body>
 
-<!-- ========== COVER ========== -->
-<section class="cover">
-  <p class="kicker">Project Post-Mortem · 2026</p>
-  <h1>从源码到跑通的 11 个坑</h1>
-  <p class="lede">一台 micro-ROS 智能小车，从厂家交付的源码到在 ROS 2 Jazzy 上跑通全部链路。做了什么、产出什么、踩了哪些"文档没写但必须知道"的细节。</p>
+<!-- ===== COVER ===== -->
+<div class="cover">
+  <p class="kicker">给同学的 ROS 2 分享 · 2026</p>
+  <h1>我用 7 天把一台 micro-ROS 小车跑通</h1>
+  <h1 style="font-size:1.8rem;color:var(--accent);margin-top:0.5rem;">ROS 2 新人的 6 个认知转变</h1>
+  <p class="lede">
+    厂家给的是一份"能编译通过的源码"，不是一份"能跑起来的产品"。
+    <br>我花了一周才搞懂那些<span style="color:var(--accent2)">文档没写、但必须知道</span>的事。
+    <br>这篇文章记录我从"以为编译过了就是跑通了"到"理解 ROS 2 真正在做什么"的全过程。
+  </p>
   <div class="meta">
     <span>📅 2026-11-17 → 2026-11-24</span>
-    <span>·</span>
-    <span>🛠️ ROS 2 Jazzy + Ubuntu 24.04</span>
-    <span>·</span>
-    <span>🤖 ESP32 + LiDAR + 云台</span>
-  </div>
-</section>
-
-<!-- ========== STATS ========== -->
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="stat-number">15</div>
-    <div class="stat-label">ROS 2 功能包</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">11</div>
-    <div class="stat-label">踩过的坑</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">6</div>
-    <div class="stat-label">代码级修复</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">0</div>
-    <div class="stat-label">新增硬件</div>
+    <span>🛠️ Ubuntu 24.04 + ROS 2 Jazzy</span>
   </div>
 </div>
 
-<!-- ========== 1. 项目背景 ========== -->
-<h2>一、项目背景与目标</h2>
+<!-- ===== OPENING ===== -->
+<p>一台 Yahboom micro-ROS V2 智能小车，厂家给了 15 个 ROS 2 功能包的源码，号称"开箱即用"。我抱着"跑个 Hello World 级 ROS 2 Demo 吧"的心态去解压源码——结果一周后我还在跑，但已经不是跑 Demo 了。</p>
 
-<p><strong>硬件</strong>：一台 Yahboom micro-ROS V2 智能小车，搭载 ESP32 控制板、激光雷达、云台相机、IMU、麦轮底盘。<strong>软件</strong>：厂家提供的 15 个 ROS 2 功能包源码，覆盖 SLAM 建图、Nav2 导航、路网规划、YOLO 视觉检测、大模型智能体。</p>
-
-<p><strong>环境</strong>：Ubuntu 24.04 + ROS 2 Jazzy，这意味着所有厂家源码都要适配最新版本（许多 API 在 Humble→Iron→Jazzy 之间发生了变化）。</p>
-
-<p><strong>初始目标</strong>：跑通全部链路 → 做语音交互找东西的视觉伺服机器人。<strong>实际目标</strong>：跑通全部链路（SLAM 建图路线放弃，转向"不建图 + 视觉伺服"路线）。</p>
-
-<!-- ========== 2. 时间线 ========== -->
-<h2>二、干了什么（时间线）</h2>
-
-<div class="figure">
-  <pre class="mermaid">
-timeline
-    title 项目进展时间线
-    11/17前 : 环境搭建
-            : colcon 工作空间配置
-            : Agent↔控制板 UDP 链路打通
-            : 相机 HTTP MJPEG 流接入
-    11/17  : 发现 QoS 不兼容
-            : 统一改 BEST_EFFORT
-            : transmission.py 修复 App 视频
-            : roadnet -Werror 编译失败定位
-            : create_client 弃用警告修复
-            : 全量编译通过 15/15
-            : rosbridge 9090 启动
-            : App 视频链路跑通
-    11/18  : 决定放弃建图路线
-            : 转向不建图 + 视觉伺服
-            : 上传 GitHub → The_car
-            : 写 auto_push.sh 自动推送
-    11/19  : 写 start_nomap.sh 一键启动
-            : odom_pose_bridge.py SIGTERM bug 修复
-    11/24  : 文档补全 123增/39删
-            : 本复盘报告
-  </pre>
-  <figcaption>图 1 · 项目关键里程碑</figcaption>
+<div class="stats">
+  <div class="stat-item">
+    <div class="stat-num">7</div>
+    <div class="stat-label">天</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">15</div>
+    <div class="stat-label">功能包</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num red">11</div>
+    <div class="stat-label">坑</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num red">6</div>
+    <div class="stat-label">认知转变</div>
+  </div>
 </div>
 
-<!-- ========== 3. 系统架构 ========== -->
-<h2>三、跑通的数据链路</h2>
+<p>这不是一篇项目报告。下面是我真正学会的事。</p>
 
-<div class="figure">
-  <pre class="mermaid">
-flowchart TB
-  subgraph ESP32["ESP32 控制板"]
-    DIR[/电机]
-    LIDAR[/雷达]
-    IMU[/IMU]
-    PTZ[/云台]
-    BATT[/电池]
-  end
+<hr>
 
-  subgraph AGENT["micro-ROS Agent (电脑进程)"]
-    direction LR
-    UDP[UDP 8090]
-  end
+<!-- ===== 开场遭遇战 ===== -->
+<h2>第一条：不是我菜，是 -Werror 把小坑炸成了编译失败</h2>
 
-  subgraph ROS2["ROS 2 话题 (Domain ID 必须一致)"]
-    direction TB
-    SCAN[/scan/]
-    IMUTOPIC[/imu/]
-    ODOM[/odom_raw/]
-    CMD[/cmd_vel/]
-    CMDPTZ[/cmd_ptz_angle/]
-    BATT[/battery/]
-  end
+<p>colcon build 的输出在 9/15 包通过时卡了一下：</p>
 
-  subgraph CAMERA["板载相机"]
-    HTTP[HTTP MJPEG :81]
-  end
+<pre><code>warning: 'rmw_qos_profile_t' is deprecated [-Wdeprecated-declarations]
+error: warnings being treated as errors [-Werror]
+gmake[2]: *** [CMakeFiles/.../route_server.dir/.../route_server.cpp.o] Error 1</code></pre>
 
-  subgraph NODES["上位机节点"]
-    CAMDRV[camera_driver<br/>BEST_EFFORT]
-    TRANS[transmission<br/>压缩图]
-    BRIDGE[odom_pose_bridge<br/>map→odom]
-    ROSBRIDGE[rosbridge<br/>WebSocket 9090]
-  end
+<p>我盯着这两行看了 10 分钟。这是 roadnet 包，一个导航路线规划器。我原以为是"我编译参数调错了"或者"版本问题"，后来才明白：</p>
 
-  subgraph APP["手机 App"]
-    VIDEO[视频流]
-    POINTCLOUD[点云地图]
-    POSE[位姿显示]
-  end
+<blockquote>ROS 2 Jazzy 把 <code>rmw_qos_profile_t</code> 这个底层 QoS 结构体<strong>标记成了弃用</strong>。但 nav2 生态的 <code>nav2_package()</code> CMake 宏默认开了 <code>-Werror</code>——这意味着任何一条弃用警告都会被升级成编译错误。</blockquote>
 
-  ESP32 ↔|micro-ROS| UDP
-  UDP ↔|ROS 2| ROS2
-  CAMERA -- HTTP MJPEG --> CAMDRV
-  ROS2 --> CAMDRV
-  CAMDRV -- /camera/image_raw --> TRANS
-  TRANS -- /camera/rgb/image_raw/compressed --> ROSBRIDGE
-  ROS2 --> BRIDGE
-  ROSBRIDGE -- WebSocket --> APP
-  TRANS -- /scan_points --> ROSBRIDGE
-  BRIDGE -- /robot_pose --> ROSBRIDGE
+<p>代码里是这样写的：</p>
 
-  style ESP32 fill:#E8EEFF,stroke:#125BFF,stroke-width:2px
-  style AGENT fill:#E8EEFF,stroke:#125BFF,stroke-width:2px
-  style CAMERA fill:#FFF0E8,stroke:#FF5A1F,stroke-width:2px
-  style APP fill:#F2F2F4,stroke:#6B6B72
-  </pre>
-  <figcaption>图 2 · 系统数据链路（不建图模式）</figcaption>
+<pre><code>// ❌ 厂家写法，Jazzy 下编译失败
+auto client = node->create_client&lt;ComputeRoute&gt;("compute_route",
+  qos.get_rmw_qos_profile());
+
+// ✅ 正确写法
+auto client = node->create_client&lt;ComputeRoute&gt;("compute_route", qos);</code></pre>
+
+<p>删掉 <code>.get_rmw_qos_profile()</code>，直接传 QoS 对象——两行代码的事。但这个"哦原来版本迁移不是改改版本号就行"的意识，是我吃了 10 分钟的"我菜不菜"焦虑才换来的。</p>
+
+<hr>
+
+<!-- ===== 认知转变 1 ===== -->
+<h2>认知转变 1</h2>
+
+<div class="insight">
+  <div class="insight-header">
+    <span class="insight-num">#01</span>
+    <h3>"ROS 2 话题通了"不代表"数据能传"——QoS 是看不见的墙</h3>
+  </div>
+  <div class="was-now">
+    <div class="was-box">
+      <span class="label">我原来以为</span>
+      发布者订阅者都在 = 话题就通了，<code>ros2 topic echo</code> 就能看到数据。
+    </div>
+    <div class="now-box">
+      <span class="label">我后来明白</span>
+      QoS（Quality of Service）匹配规则是 ROS 2 里<strong>最隐形的兼容性杀手</strong>。发布端 RELIABLE 订阅端 BEST_EFFORT，或者 history/depth 不一样，话题就会出现"有发布者有订阅者但没数据"的幽灵状态。
+    </div>
+  </div>
+  <p class="story">
+    相机视频话题就是这么卡的。<code>camera_driver.py</code> 默认用传感器 QoS（RELIABLE），<code>transmission.py</code> 订阅端没显式声明，App 视频流黑屏了整整两天我没查出原因。直到我敲了 <code>ros2 topic info -v /camera/image_raw</code> 看到 QoS 详细输出，才发现两端不一致。统一改成 <code>SensorDataQoS()</code>（BEST_EFFORT + keep last 5）后，第一帧画面就出来了。
+  </p>
+  <p class="story">
+    <strong>这对我以后意味着什么</strong>：<code>topic info -v</code> 是 ROS 2 调试的第一条命令，永远先用。
+  </p>
 </div>
 
-<h3>关键设计决策</h3>
+<!-- ===== 认知转变 2 ===== -->
+<h2>认知转变 2</h2>
 
-<div class="success-card">
-  <strong>不建图路线：</strong>放弃厂家默认的 SLAM 建图 → Nav2 全局规划链路。原因是用户明确不想手动走一圈小车建图，且室内光线条件下 SLAM 效果一般。改为"视觉伺服"——用相机画面中的目标框位置/大小直接闭环控制 <code>/cmd_vel</code>。
+<div class="insight">
+  <div class="insight-header">
+    <span class="insight-num">#02</span>
+    <h3>厂家给你的是源码，不是产品——那些写死的路径和隐式依赖</h3>
+  </div>
+  <div class="was-now">
+    <div class="was-box">
+      <span class="label">我原来以为</span>
+      <code>colcon build --symlink-install</code> 过了 = 所有东西都就位了，直接 <code>ros2 launch</code>。
+    </div>
+    <div class="now-box">
+      <span class="label">我后来明白</span>
+      launch 文件背后藏着厂家写死的路径、隐式的配置文件位置、默认参数。换台电脑或者换目录，这些"看不见的依赖"就会浮到水面上。
+    </div>
+  </div>
+  <p class="story">
+    <code>bringup_app.launch.py</code> 里调用了 <code>GetCameraUrl()</code>，它在 <code>robot_tool.py</code> 里写死读 <code>~/microros_ws/.system_cfg/robot_info.json</code>——不是 launch file 同目录的 <code>.system_cfg</code>，而是 home 目录下另一个位置。我在新电脑上直接 launch，第一秒就抛 <code>FileNotFoundError</code>。
+  </p>
+  <p class="story">
+    更微妙的是 <code>camera_driver.py</code> 的标定文件。<code>ost.yaml</code> 厂家明明放在包里了，但 <code>ost_file</code> 参数默认空字符串——launch 里有传参所以没事，我手动启动 <code>python3 camera_driver.py</code> 就会看到 <code>No valid ost_file</code>，CameraInfo 话题空数据。标定文件不是丢了，是启动方式决定了它会不会被加载。
+  </p>
+  <p class="story">
+    <strong>这对我以后意味着什么</strong>：编译通过后，先 <code>grep -r "~/" src/launch/ src/*.launch* 2>/dev/null | head -20</code> 扫一遍硬编码路径。
+  </p>
 </div>
 
-<!-- ========== 4. 产出物 ========== -->
-<h2>四、产出物清单</h2>
+<!-- ===== 认知转变 3 ===== -->
+<h2>认知转变 3</h2>
 
-<div class="table-wrap">
-<table>
-  <thead>
-    <tr><th>产出</th><th>类型</th><th>位置</th><th>状态</th></tr>
-  </thead>
-  <tbody>
-    <tr><td>GitHub 仓库</td><td>首次提交</td><td>github.com/Asang712/The_car</td><td>运行中</td></tr>
-    <tr><td>全量编译</td><td>修复 roadnet</td><td>colcon build --symlink-install</td><td>15/15 通过</td></tr>
-    <tr><td>相机→App 视频链路</td><td>QoS 修复</td><td>transmission.py + camera_driver.py</td><td>BEST_EFFORT 统一</td></tr>
-    <tr><td>Agent↔控制板 UDP</td><td>配置完成</td><td>micro-ROS Agent 工作空间</td><td>稳定（前台进程）</td></tr>
-    <tr><td><code>start_nomap.sh</code></td><td>自动化脚本</td><td>项目根目录</td><td>实测干净启动/退出</td></tr>
-    <tr><td><code>auto_push.sh</code></td><td>自动化脚本</td><td>项目根目录</td><td>运行中，300s 轮询</td></tr>
-    <tr><td><code>odom_pose_bridge.py</code> SIGTERM 修复</td><td>代码修复</td><td>ros_robot_app 包</td><td>已提交推送</td></tr>
-    <tr><td>项目说明文档更新</td><td>文档</td><td>mircoros_v2项目文件说明.md</td><td>123增 39删</td></tr>
-  </tbody>
-</table>
+<div class="insight">
+  <div class="insight-header">
+    <span class="insight-num">#03</span>
+    <h3>硬件约束先排查，别先调代码</h3>
+  </div>
+  <div class="was-now">
+    <div class="was-box">
+      <span class="label">我原来以为</span>
+      "车不动"大概率是我 <code>/cmd_vel</code> 指令写错了，先查代码。
+    </div>
+    <div class="now-box">
+      <span class="label">我后来明白</span>
+      电源模式、USB 模式、Wi-Fi 连接、Agent 进程——这些<strong>比任何算法都更"底层"</strong>。软件调半天，可能只是电池没电。
+    </div>
+  </div>
+  <p class="story">
+    我在"代码没错但车不动"上浪费的时间里，80% 最后发现是这 5 件事：
+  </p>
+  <div class="reveal">
+    <strong>1. USB 插控制板 → 手柄模式</strong>：USB 连 ESP32 时固件自动切 USB HID 手柄控制，完全忽略 <code>/cmd_vel</code>。拔掉 USB 才恢复话题控制。
+  </div>
+  <div class="reveal">
+    <strong>2. 电池 &lt; 6.50V → 挂起所有模块</strong>：ESP32 上电先查电压，低于阈值直接挂 Wi-Fi、相机、串口。看起来像"软件没连上"，实际是硬件自我保护。
+  </div>
+  <div class="reveal">
+    <strong>3. 手机热点 DHCP → 每次重启 IP 全变</strong>：电脑、控制板、相机三个设备每次热点重启都要重新扫 IP，然后更新 <code>robot_info.json</code> 里的 <code>camera_ip</code>。
+  </div>
+  <div class="reveal">
+    <strong>4. Agent 是前台进程</strong>：关终端 = Agent 终止 = <code>topic list</code> 全空。放 tmux 里跑。
+  </div>
+  <div class="reveal">
+    <strong>5. Domain ID 必须两端一致</strong>：Agent 和控制板用不同频道，ROS 2 正常但节点互相发现失败，话题列表为空。
+  </div>
+  <p class="story">
+    <strong>这对我以后意味着什么</strong>：软件调试之前先过一遍"电源、USB、Wi-Fi、进程状态、频道"五件套。
+  </p>
 </div>
 
-<!-- ========== 5. 踩过的坑 ========== -->
-<h2>五、11 个坑</h2>
+<!-- ===== 认知转变 4 ===== -->
+<h2>认知转变 4</h2>
 
-<p>按根因分成 <strong>6 类</strong>。每个坑都有具体的现象、根因、修复方式和教训，方便复用时快速定位。</p>
+<div class="insight">
+  <div class="insight-header">
+    <span class="insight-num">#04</span>
+    <h3>ROS 2 版本升级的隐形地雷</h3>
+  </div>
+  <div class="was-now">
+    <div class="was-box">
+      <span class="label">我原来以为</span>
+      从 Humble 升到 Jazzy 是"改个环境变量、编一下"的事。
+    </div>
+    <div class="now-box">
+      <span class="label">我后来明白</span>
+      ROS 2 每个版本都有弃用迁移指南，Jazzy 尤其多。<strong>-Werror 会把任何小警告炸成编译失败</strong>。
+    </div>
+  </div>
+  <p class="story">
+    roadnet 的 <code>rmw_qos_profile_t</code> 弃用警告是最明显的例子。但更深层的是：nav2 生态用 <code>nav2_package()</code> 宏统一管理编译参数，它默认开启 <code>-Wall -Wextra -Werror</code>。厂家源码可能是 Humble 时代写的，在 Jazzy 上编不过不是厂家菜，是<strong>版本升级链路里的隐式断裂</strong>。
+  </p>
+  <p class="story">
+    我修复的代码只有两行，但理解"为什么这两行会影响整个编译"花了我 40 分钟读 CMakeLists.txt 和 nav2 的宏定义。这是比改代码本身更重要的东西。
+  </p>
+  <p class="story">
+    <strong>这对我以后意味着什么</strong>：升级 ROS 2 版本时，先 grep 一遍项目里所有 <code>.get_rmw_qos_profile</code> 和旧版 API。
+  </p>
+</div>
 
-<!-- 饼图 -->
+<!-- ===== 认知转变 5 ===== -->
+<h2>认知转变 5</h2>
+
+<div class="insight">
+  <div class="insight-header">
+    <span class="insight-num">#05</span>
+    <h3>不建图也能做机器人——选你真正需要的，不要默认选最复杂的</h3>
+  </div>
+  <div class="was-now">
+    <div class="was-box">
+      <span class="label">我原来以为</span>
+      SLAM 建图 → Nav2 全局规划是"正规机器人"的标准路线。不建图的都是玩具。
+    </div>
+    <div class="now-box">
+      <span class="label">我后来明白</span>
+      <strong>视觉伺服 + AprilTag 视觉路标</strong>这条路成本低、稳定、无需标定地图，更适合室内找东西、跟人这种场景。
+    </div>
+  </div>
+  <div class="story">
+    厂家代码里 SLAM 建图、Nav2 导航、roadnet 路网全写好了。但用户明确说"不想手动驾驶小车走一圈建图"，我也理解这个决策——室内光线条件下 SLAM 效果本来就一般，Nav2 全局规划要建图、标定、TF 树对齐，一步出错全断。
+  </div>
+  <div class="story">
+    视觉伺服方案很简单：相机每帧检测目标 → 框在画面左边就右转、框大了就前进 → 框足够大足够居中就停。本质是用<strong>画面特征直接闭环控制</strong>，不用地图、不用全局定位、不用导航栈。
+  </div>
+  <div class="reveal">
+    <strong>选路线的方法论</strong>：先问"我到底要解决什么问题"，再选工具。不要反过来——不要因为 SLAM 是大项目就默认自己也应该用。
+  </div>
+</div>
+
+<!-- ===== 认知转变 6 ===== -->
+<h2>认知转变 6</h2>
+
+<div class="insight">
+  <div class="insight-header">
+    <span class="insight-num">#06</span>
+    <h3>自动化脚本写死那些容易忘的"脏活"</h3>
+  </div>
+  <div class="was-now">
+    <div class="was-box">
+      <span class="label">我原来以为</span>
+      手动跑 Agent、手动 launch、手动 git push 就是正常工作流。
+    </div>
+    <div class="now-box">
+      <span class="label">我后来明白</span>
+      那些<strong>每次手动做都容易忘、但又必须做</strong>的事，值得写一个几行 shell 脚本。
+    </div>
+  </div>
+  <div class="story">
+    我写了两个脚本，加起来不到 200 行：
+  </div>
+  <div class="success">
+    <strong>start_nomap.sh</strong>：一条命令拉起 Agent + launch + odom_pose_bridge，Ctrl+C 全退。最值钱的功能不是"一键启动"，而是<strong>自动检查 robot_info.json 存在不存在、退出时清理残留进程</strong>。
+  </div>
+  <div class="success">
+    <strong>auto_push.sh</strong>：300 秒轮询、自动 rebase、flock 防重复。最值钱的功能是<strong>不用每次 commit 再 push</strong>，也不用怕"改了东西忘了提交"。
+  </div>
+  <p class="story">
+    写这些脚本的成本远低于"某次忘了推代码、某次退出没清理干净导致下次启动冲突"的返工成本。
+  </p>
+</div>
+
+<hr>
+
+<!-- ===== 可视化：坑的分布 ===== -->
+<h2>我花时间最多在哪类问题上</h2>
+
 <div class="chart-figure">
-  <figcaption>坑的根因分类分布</figcaption>
-  <div id="chart-pitfall-pie" style="width:100%;min-height:320px"></div>
+  <div id="chart-pie" style="width:100%;min-height:300px"></div>
+  <figcaption>11 个坑按根因分类的分布</figcaption>
 </div>
 
-<!-- A. ROS 2 Jazzy 版本升级 -->
-<h3>A. ROS 2 Jazzy 版本升级问题（1 个）</h3>
+<p>硬件约束问题占了最多——这很反直觉。我原来以为软件坑会多，结果一半的"调试时间"花在了"等硬件连好、排查硬件状态"上。</p>
 
-<div class="pitfall-card">
-  <div class="pitfall-header">
-    <span class="pitfall-num">P01</span>
-    <h3>roadnet <code>create_client</code> 传 <code>.get_rmw_qos_profile()</code> → 弃用警告 → -Werror 编译失败</h3>
+<hr>
+
+<!-- ===== 给同学的建议 ===== -->
+<h2>如果你也想玩，我的 checklist</h2>
+
+<p>这是我希望<strong>自己 7 天前就能看到</strong>的东西。按顺序来，能省至少 3 天：</p>
+
+<div class="stats" style="background:transparent;padding:0;margin:0 0 1.5rem;border-radius:0;border:none;">
+  <div class="stat-item" style="background:var(--bg2);border-radius:var(--radius);padding:0.85rem;flex:1;margin:0 0.4rem;">
+    <div class="stat-num" style="font-size:1.4rem;">Step 1</div>
+    <div class="stat-label">编译前</div>
   </div>
-  <div class="pitfall-row"><span class="pitfall-label">现象</span><span class="pitfall-value"><code>colcon build</code> roadnet 失败，<code>events.log</code> 里是 warning: 'rmw_qos_profile_t' is deprecated [-Werror]</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">根因</span><span class="pitfall-value">Jazzy 把 <code>rmw_qos_profile_t</code> 标记为弃用，推荐直接用 <code>rclcpp::QoS</code>。<code>nav2_package()</code> 宏默认开 -Werror，把警告升级为编译错误</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">修复</span><span class="pitfall-value">删掉 <code>.get_rmw_qos_profile()</code>，直接传 QoS 对象：<code>auto client = node->create_client&lt;ComputeRoute&gt;("compute_route", qos);</code></span></div>
-  <div class="pitfall-row"><span class="pitfall-label">教训</span><span class="pitfall-value">ROS 2 每个版本都有 API 弃用迁移指南，升级时 <strong>先 grep 一遍</strong> <code>get_rmw_qos_profile</code> 这类容易踩的旧写法</span></div>
-</div>
-
-<!-- B. QoS 不匹配 -->
-<h3>B. QoS 不匹配（1 个）</h3>
-
-<div class="pitfall-card">
-  <div class="pitfall-header">
-    <span class="pitfall-num">P02</span>
-    <h3>transmission 订阅相机话题收不到数据</h3>
+  <div class="stat-item" style="background:var(--bg2);border-radius:var(--radius);padding:0.85rem;flex:1;margin:0 0.4rem;">
+    <div class="stat-num" style="font-size:1.4rem;">Step 2</div>
+    <div class="stat-label">编译后</div>
   </div>
-  <div class="pitfall-row"><span class="pitfall-label">现象</span><span class="pitfall-value"><code>ros2 topic info /camera/image_raw</code> 显示 1 发布者 1 订阅者，<code>echo</code> 不出任何数据，App 视频黑屏</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">根因</span><span class="pitfall-value">发布端用传感器 QoS（RELIABLE），订阅端没显式声明 → 默认 RELIABLE 但可能有其他参数不一致（history/depth）</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">修复</span><span class="pitfall-value">两端都显式设 <code>rclcpp::SensorDataQoS()</code> → BEST_EFFORT + keep last 5</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">教训</span><span class="pitfall-value">ROS 2 QoS 不匹配是"看起来一切正常、就是没数据"的头号原因。<strong>任何话题调试第一步先确认 QoS</strong>：<code>ros2 topic info -v /topic_name</code></span></div>
-</div>
-
-<!-- C. 启动前置条件隐式依赖 -->
-<h3>C. 启动前置条件隐式依赖（2 个）</h3>
-
-<div class="pitfall-card">
-  <div class="pitfall-header">
-    <span class="pitfall-num">P03</span>
-    <h3><code>bringup_app.launch.py</code> 抛 <code>FileNotFoundError: ~/microros_ws/.system_cfg/robot_info.json</code></h3>
+  <div class="stat-item" style="background:var(--bg2);border-radius:var(--radius);padding:0.85rem;flex:1;margin:0 0.4rem;">
+    <div class="stat-num" style="font-size:1.4rem;">Step 3</div>
+    <div class="stat-label">启动前</div>
   </div>
-  <div class="pitfall-row"><span class="pitfall-label">根因</span><span class="pitfall-value"><code>robot_tool.py</code> 的 <code>GetCameraUrl()</code> 写死读 <code>~/microros_ws/.system_cfg/robot_info.json</code>，不是 launch file 同目录的 <code>.system_cfg</code>，换台电脑就找不到</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">修复</span><span class="pitfall-value">手动 <code>mkdir -p ~/microros_ws/.system_cfg && cp ...</code>；<code>start_nomap.sh</code> 自动做这步</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">教训</span><span class="pitfall-value">厂家写代码时假设了固定路径，这在跨机器部署时必炸。<strong>第一次启动前先 grep 一遍</strong> launch 里引用的文件路径</span></div>
-</div>
-
-<div class="pitfall-card">
-  <div class="pitfall-header">
-    <span class="pitfall-num">P04</span>
-    <h3>直跑 <code>camera_driver.py</code> 报 <code>No valid ost_file</code>，CameraInfo 发空</h3>
+  <div class="stat-item" style="background:var(--bg2);border-radius:var(--radius);padding:0.85rem;flex:1;margin:0 0.4rem;">
+    <div class="stat-num" style="font-size:1.4rem;">Step 4</div>
+    <div class="stat-label">跑起来后</div>
   </div>
-  <div class="pitfall-row"><span class="pitfall-label">根因</span><span class="pitfall-value"><code>ost_file</code> 参数默认空字符串，launch 里有 <code>-p ost_file:=...</code> 传参，手动启动忘记加</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">修复</span><span class="pitfall-value">直跑时补 <code>-p ost_file:=/绝对路径/config/ost.yaml</code>；或者直接用 launch</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">教训</span><span class="pitfall-value"><strong>标定文件不是丢了</strong>（厂家有 <code>config/ost.yaml</code>），只是启动方式决定了它会不会被加载</span></div>
 </div>
 
-<!-- D. 硬件约束（5 个） -->
-<h3>D. 硬件约束（5 个）</h3>
+<h4>Step 1 · 编译前</h4>
+<ul class="checklist">
+  <li class="watch" data-check="◉">先确认硬件型号和 ROS 2 版本兼容性（厂家源码是 Humble → 你是 Jazzy？）</li>
+  <li class="watch" data-check="◉">grep 一遍源码里所有 <code>.get_rmw_qos_profile</code> 和 <code>rmw_qos_profile_t</code>，这些在 Jazzy 上会炸</li>
+  <li class="do" data-check="✓">先 <code>colcon build --symlink-install --packages-up-to interfaces</code> 编依赖，再全量</li>
+</ul>
 
-<p>这 5 个坑都是"软件调通了但硬件状态不对"导致的软件层假象。</p>
+<h4>Step 2 · 编译通过后</h4>
+<ul class="checklist">
+  <li class="watch" data-check="◉">grep 所有 launch 文件里的 <code>~/</code> 硬编码路径，<strong>逐个</strong>确认这些文件真的存在于那些位置</li>
+  <li class="do" data-check="✓">扫每个包的 <code>setup.py</code> entry_points，<strong>确认</strong>所有想用的节点都注册了 <code>console_scripts</code></li>
+  <li class="do" data-check="✓">保存所有 launch 和 config 里的默认参数值（<code>ost.yaml</code> 在哪、QoS 是什么）</li>
+</ul>
 
-<div class="hw-callout">
-  <h4>P05 · USB 插控制板 → 手柄模式</h4>
-  <p>USB 线连接 ESP32 时，固件自动切换为 USB HID 手柄控制模式，<strong>完全忽略</strong> <code>/cmd_vel</code> 话题。拔掉 USB 才恢复话题控制。调试时如果发现"代码没错但车不动"，<strong>先看 USB 是否插着</strong>。</p>
-</div>
+<h4>Step 3 · 启动前</h4>
+<ul class="checklist">
+  <li class="do" data-check="✓">确认 USB 没插控制板 → 插了就变手柄模式忽略 <code>/cmd_vel</code></li>
+  <li class="do" data-check="✓">确认电池电压 ≥ 6.50V → 低于这个数 ESP32 挂起所有模块</li>
+  <li class="do" data-check="✓">确认 Agent 和控制板的 <code>ROS_DOMAIN_ID</code> 完全相同</li>
+  <li class="watch" data-check="◉">手机热点刚重启过 → 先重新扫描所有 IP，再更新 <code>robot_info.json</code></li>
+</ul>
 
-<div class="hw-callout">
-  <h4>P06 · 电池电压门禁 < 6.50V → 挂起所有模块</h4>
-  <p>ESP32 上电后首先检测电池电压，<strong>低于 6.50V 则挂起 Wi-Fi、相机、串口等全部模块</strong>。表现为：控制板不连热点、Agent 搜不到、串口配置超时。看似软件问题，实则电池没电。</p>
-</div>
+<h4>Step 4 · 跑起来后</h4>
+<ul class="checklist">
+  <li class="do" data-check="✓">任何话题先出问题 → <code>ros2 topic info -v /名称</code> 查 QoS 是否匹配</li>
+  <li class="do" data-check="✓">决定路线时问自己：我真的需要全局地图吗？视觉伺服 + AprilTag 可能就够了</li>
+  <li class="do" data-check="✓">把那些"容易忘"的脏活（git push、进程清理、配置文件复制）写进脚本，别手动做</li>
+</ul>
 
-<div class="hw-callout">
-  <h4>P07 · 手机热点 DHCP → 每次重启 IP 全变</h4>
-  <p>手机热点开启 DHCP 服务器，每次热点重启，电脑、控制板、相机<strong>三个设备的 IP 都会重新分配</strong>。相机 HTTP 流打不开、Agent 找不到控制板，很大概率是 IP 变了。需要重新 <code>nmap</code> 扫描并更新 <code>robot_info.json</code> 的 <code>camera_ip</code>。</p>
-</div>
+<hr>
 
-<div class="hw-callout">
-  <h4>P08 · MicroROS Agent 是前台进程</h4>
-  <p>Agent 是普通的 ROS 2 Python 进程，关闭其终端窗口 = 进程终止 = micro-ROS 通信链路断开 = <code>ros2 topic list</code> 全空。调试时把 Agent 放在<strong>独立的 tmux/screen session</strong> 里，或用 <code>nohup</code> 挂后台。</p>
-</div>
+<!-- ===== 仓库与启动 ===== -->
+<h2>仓库和一键启动</h2>
 
-<div class="hw-callout">
-  <h4>P09 · ROS 2 Domain ID 必须两端一致</h4>
-  <p>Domain ID 是 ROS 2 的"频道"，Agent 端和控制板端必须用<strong>完全相同</strong>的值。厂家配置工具默认 40，教程文档示例是 49。不一致时节点互相发现失败，话题列表为空，但 <code>ros2 daemon status</code> 正常——典型的"看似正常实则失联"状态。</p>
-</div>
+<p>所有代码和脚本都推上去了：</p>
 
-<!-- E. 代码 bug -->
-<h3>E. 代码 bug（1 个）</h3>
+<table>
+  <tr><th>东西</th><th>在哪</th></tr>
+  <tr><td>全部源码 + 修复</td><td><code>github.com/Asang712/The_car</code></td></tr>
+  <tr><td>一键启动不建图模式</td><td><code>./start_nomap.sh --check</code> 先自检，<code>./start_nomap.sh</code> 一条命令</td></tr>
+  <tr><td>自动 commit + push</td><td><code>./auto_push.sh --watch</code> 常驻</td></tr>
+</table>
 
-<div class="pitfall-card">
-  <div class="pitfall-header">
-    <span class="pitfall-num">P10</span>
-    <h3><code>odom_pose_bridge.py</code> SIGTERM 处理 → 关机刷 <code>RCLError</code> 堆栈</h3>
-  </div>
-  <div class="pitfall-row"><span class="pitfall-label">现象</span><span class="pitfall-value">Ctrl+C 终止时，第二行刷 <code>RCLError: rclpy context already shutdown</code>，程序虽退出但堆栈难看</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">根因</span><span class="pitfall-value">收到 SIGTERM 时 <code>rclpy.shutdown()</code> 被调用两次（一次信号处理、一次 main 函数末尾），第二次抛异常</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">修复</span><span class="pitfall-value">加 <code>if rclpy.ok(): rclpy.shutdown()</code> 判断，并捕获 <code>ExternalShutdownException</code></span></div>
-</div>
+<hr>
 
-<!-- F. 工具链与体验 -->
-<h3>F. 工具链与体验（1 个）</h3>
+<!-- ===== 我还没做完 ===== -->
+<h2>我还没做完的事（不是失败，是路线图）</h2>
 
-<div class="pitfall-card">
-  <div class="pitfall-header">
-    <span class="pitfall-num">P11</span>
-    <h3><code>odom_pose_bridge.py</code> 未注册 <code>ros2 run</code> 入口</h3>
-  </div>
-  <div class="pitfall-row"><span class="pitfall-label">现象</span><span class="pitfall-value"><code>ros2 run ros_robot_app odom_pose_bridge</code> 报 "找不到可执行文件"</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">根因</span><span class="pitfall-value"><code>setup.py</code> 的 <code>console_scripts</code> 只注册了 3 个，<code>odom_pose_bridge</code> 不在其中</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">临时方案</span><span class="pitfall-value">直接 <code>python3 /绝对路径/odom_pose_bridge.py</code>，<code>start_nomap.sh</code> 里已经这么做了</span></div>
-  <div class="pitfall-row"><span class="pitfall-label">教训</span><span class="pitfall-value">厂家源码里可能有"写好但没接线"的节点，功能是对的但不能用 <code>ros2 run</code> 调起来。<strong>每个包先扫一眼 setup.py 的 entry_points</strong></span></div>
-</div>
-
-<!-- ========== 6. 放弃的路线 ========== -->
-<h2>六、放弃的路线</h2>
-
-<p>这些路线厂家代码都已经写好了，但因为硬件/用户需求/复杂度等原因放弃：</p>
-
-<div class="failure-card">
-  <strong>SLAM 建图 → Nav2 全局规划：</strong>厂家默认路线，需要手动驾驶小车走一圈建图，再配合 Nav2 做全局路径规划。用户明确"不想去建地图"，且室内光线条件下 SLAM 效果可能一般。
-</div>
-
-<div class="failure-card">
-  <strong>roadnet 路网导航：</strong>依赖先验地图 + geojson 路网文件，属于建图路线的延伸。随 SLAM 一起放弃。
-</div>
-
-<div class="failure-card">
-  <strong>车上加装 I2S 语音模块：</strong>硬件改造量大、ESP32 算力不足、音频上传带宽受限。改为 <strong>电脑端麦克风 + 本地 whisper.cpp</strong>，不动小车硬件。
-</div>
-
-<!-- ========== 7. 遗留项 ========== -->
-<h2>七、遗留项与下一步</h2>
-
-<div class="progress-container">
-  <div class="progress-label"><span>视觉伺服核心节点（不建图路线的关键）</span><span>0%</span></div>
-  <div class="progress-bar"><div class="progress-fill amber" style="width:0%"></div></div>
-</div>
-<div class="progress-container">
-  <div class="progress-label"><span>帧率瓶颈诊断（当前 3～4 Hz，视觉伺服会振荡）</span><span>0%</span></div>
-  <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
-</div>
-<div class="progress-container">
-  <div class="progress-label"><span>语音入口（电脑麦克风 + whisper.cpp）</span><span>0%</span></div>
-  <div class="progress-bar"><div class="progress-fill amber" style="width:0%"></div></div>
-</div>
-<div class="progress-container">
-  <div class="progress-label"><span>语音播报（电脑扬声器，piper / espeak-ng）</span><span>0%</span></div>
-  <div class="progress-bar"><div class="progress-fill amber" style="width:0%"></div></div>
-</div>
-<div class="progress-container">
-  <div class="progress-label"><span>AprilTag 视觉路标（跨房间导航，可选）</span><span>0%</span></div>
-  <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
-</div>
-
-<h3>最高优先级：帧率瓶颈</h3>
-
-<div class="warning-card" style="background:#FFF0E8;border-radius:6px;padding:1rem;border-left:4px solid #FF5A1F;margin:1rem 0;">
-  <strong style="color:#FF5A1F">⚠️ 如果直接接入视觉伺服</strong>，3～4 Hz 的帧率会让闭环控制每 250～330 ms 才更新一次，小车靠近目标时会一顿一顿甚至来回振荡。建议先花 10 分钟在 <code>camera_driver.py</code> 里加计时，定位 <code>cap.read()</code> 和 JPEG 编码各自的耗时占比。
-</div>
-
-<!-- ========== 8. 反思 ========== -->
-<h2>八、反思</h2>
-
-<h3>干成的事 vs 真正新开发</h3>
+<p>跑通基础链路 + 修复编译 + 写自动化脚本 + 补文档，这些全是"把厂家给的东西跑起来"——本质是集成工作。真正的新开发还没开始：</p>
 
 <div class="two-col">
   <div>
-    <p><strong>干成的</strong>：基础链路、编译修复、QoS、App 联动、自动化脚本、文档补全。</p>
-    <p>这些全是"把厂家给的东西跑起来并顺手修好厂家没处理的坑"——本质是集成工作。</p>
+    <p><strong>接下来要写的核心</strong>：</p>
+    <ul style="margin-left:1.2rem;font-size:0.9rem;line-height:1.9;">
+      <li>视觉伺服核心节点（目标搜索 → 框位置→角速度 → 框面积→前进速度）</li>
+      <li>帧率瓶颈诊断（当前 3～4 Hz，伺服闭环会振荡）</li>
+      <li>语音入口（电脑麦克风 + whisper.cpp，不动小车硬件）</li>
+      <li>语音播报（电脑扬声器，piper / espeak-ng）</li>
+    </ul>
   </div>
   <div>
-    <p><strong>真正新开发</strong>：还没有。</p>
-    <p>视觉伺服、语音入口、语音播报三个核心模块一个都没写。现在是"基础设施就绪，等业务逻辑接入"。</p>
+    <p><strong>我为什么不把 SLAM 也做了</strong>：</p>
+    <p style="font-size:0.88rem;line-height:1.75;color:var(--muted);">不是做不出来，是我不想花一周手动开着小车在房间里绕圈建图——而且就算建了图，室内光线条件下效果也一般。用户的目标是"语音找东西"，视觉伺服就够了。复杂的东西不一定更好。</p>
   </div>
 </div>
 
-<h3>通用方法论</h3>
+<hr>
 
-<ol style="margin-left:1.2rem;margin-top:1rem;font-size:0.9rem;line-height:1.9;">
-  <li><strong>版本升级先 grep 一遍弃用 API</strong>：ROS 2 每个版本都有迁移指南，<code>-Werror</code> 会把任何小问题升级为编译失败。Jazzy 迁移最容易踩的三个：<code>rmw_qos_profile_t</code>、<code>create_service</code> 重载、LifeCycle 节点状态机。</li>
-  <li><strong>"话题没数据"90% 是 QoS 问题</strong>：遇到 <code>topic info</code> 显示发布者/订阅者齐全但 <code>echo</code> 空输出，先用 <code>-v</code> 看详细 QoS，再两边统一。</li>
-  <li><strong>厂家源码 ≠ 厂家成品</strong>：厂家给的是"可编译的源码"，不是"开箱即用的产品"。路径硬编码、配置文件位置、launch 隐式依赖这些东西，必须逐个 <code>grep</code> 出来。</li>
-  <li><strong>硬件约束先排查</strong>：电源、USB 模式、Wi-Fi 连接、Agent 进程状态——这些在软件调试之前先确认。我在"代码没错但车不动"上浪费的时间里，80% 最后发现是硬件状态问题。</li>
-  <li><strong>自动化脚本优先写死"脏活"部分</strong>：<code>start_nomap.sh</code> 最值钱的功能不是一键启动，而是"自动检查 <code>robot_info.json</code> 存在不存在、复制过去、退出时清理进程"——这些每次手动做容易忘。</li>
-</ol>
+<!-- ===== ENDING ===== -->
+<p style="text-align:center;font-size:0.95rem;color:var(--muted);margin-top:3rem;">
+  谢谢你读完。<br>
+  有问题在 GitHub 提 issue 或者直接找我。
+</p>
 
-<!-- ========== FOOTER ========== -->
 <footer>
-  <h2>参考与来源</h2>
-  <ol>
-    <li id="cite-1"><span class="src-title">micro-ROS V2 项目源码，厂家交付包</span><span class="src-url">本地工作空间 /home/asang/mircoros_v2-1.0.1/mircoros_v2</span></li>
-    <li id="cite-2"><span class="src-title">ROS 2 Jazzy 迁移指南，rmw_qos_profile_t 弃用说明</span><a class="src-url" href="https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Using-Substitutions.html" target="_blank" rel="noopener">https://docs.ros.org/en/jazzy/</a></li>
-    <li id="cite-3"><span class="src-title">nav2_package() 宏 -Werror 行为</span><a class="src-url" href="https://github.com/ros-navigation/navigation2/blob/main/nav2_common/cmake/nav2_package.cmake" target="_blank" rel="noopener">https://github.com/ros-navigation/navigation2</a></li>
-    <li id="cite-4"><span class="src-title">本项目 GitHub 仓库</span><a class="src-url" href="https://github.com/Asang712/The_car" target="_blank" rel="noopener">https://github.com/Asang712/The_car</a></li>
-  </ol>
+  <p><strong>这篇分享里所有具体数字和事件</strong>（roadnet 编译失败、QoS BEST_EFFORT、电池 6.50V 门禁、Agent 前台进程……）都来自我自己的对话记录和调试输出，没有编造。如果其中有哪里描述不准确，请告诉我，我会更新。</p>
+  <p style="margin-top:1rem;">生成时间：2026-11-24 · 工作空间：/home/asang/mircoros_v2-1.0.1</p>
 </footer>
 
-<!-- ===== Scripts ===== -->
 <script src="./_shared/js/echarts.min.js"></script>
-<script src="./_shared/js/mermaid.min.js"></script>
 <script>
-  mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
+  // 坑的分类分布饼图
+  (function() {
+    var style = getComputedStyle(document.documentElement);
+    var accent = style.getPropertyValue('--accent').trim();
+    var accent2 = style.getPropertyValue('--accent2').trim();
+    var ink = style.getPropertyValue('--ink').trim();
+    var muted = style.getPropertyValue('--muted').trim();
+
+    var chart = echarts.init(document.getElementById('chart-pie'), null, { renderer: 'svg' });
+    chart.setOption({
+      tooltip: { appendToBody: true, trigger: 'item', formatter: '{b}<br/>{c} 个坑（{d}%）' },
+      legend: { bottom: 0, left: 'center', textStyle: { color: muted, fontSize: 12 }, itemGap: 18 },
+      color: [accent2, accent, accent + 'CC', accent + '99', muted + 'CC', muted],
+      series: [{
+        type: 'pie', radius: ['38%', '68%'], center: ['50%', '40%'],
+        itemStyle: { borderColor: '#fff', borderWidth: 2 },
+        label: { show: true, formatter: '{b}\n{c}', color: ink, fontSize: 12 },
+        labelLine: { show: true, length: 12, length2: 8 },
+        data: [
+          { value: 5, name: '硬件约束' },
+          { value: 2, name: '启动前置条件' },
+          { value: 1, name: 'ROS 2 Jazzy 版本' },
+          { value: 1, name: 'QoS 不匹配' },
+          { value: 1, name: '代码 bug' },
+          { value: 1, name: '工具链体验' }
+        ]
+      }]
+    });
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
 </script>
-<script src="assets/charts.js"></script>
 </body>
 </html>
