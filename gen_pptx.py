@@ -214,10 +214,11 @@ toc_items = [
     ('03', '硬件约束先排查别先调代码', '我浪费 80% 调试时间的原因'),
     ('04', 'ROS 2 版本升级的隐形地雷', '-Werror 会把小警告炸成编译失败'),
     ('05', '不建图也能做机器人', '视觉伺服路线选择'),
+    ('★', '视觉伺服详解', '框位置→角速度 / 框面积→前进速度，闭环原理展开'),
     ('06', '自动化脚本写死脏活', '200 行 shell 省好几天返工'),
 ]
 for i, (num, title, sub) in enumerate(toc_items):
-    row_y = Inches(1.8 + i * 0.85)
+    row_y = Inches(1.75 + i * 0.76)
     # num badge
     badge = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
                                Inches(1.3), row_y, Inches(0.7), Inches(0.65))
@@ -432,6 +433,71 @@ insight_slide(prs, '#05', '不建图也能做机器人',
     '视觉伺服 + AprilTag 视觉路标这条路成本低、稳定、无需标定地图，更适合室内找东西、跟人这种场景。',
     '厂家默认路线 SLAM → Nav2 → roadnet 全写好了。但用户明确说"不想手动驾驶小车走一圈建图"——室内光线条件下 SLAM 效果本来就一般，Nav2 全局规划要建图、标定、TF 树对齐，一步出错全断。\n\n视觉伺服原理很简单：相机每帧检测目标 → 框在画面左边就右转、框大了就前进 → 框足够大足够居中就停。本质是用画面特征直接闭环控制，不用地图、不用全局定位。',
     '✅ 先问"我到底要解决什么问题"，再选工具\n✅ 不要默认选最复杂的方案\n✅ 视觉伺服 vs SLAM：你真的需要全局地图吗？')
+
+# ===== SLIDE: 视觉伺服详解 =====
+s = prs.slides.add_slide(blank)
+add_bg(s, WHITE)
+add_accent_bar(s, Inches(0.8), Inches(0.6), Pt(36), BG_TEAL)
+add_text(s, '视觉伺服：用画面直接控制小车', Inches(1.1), Inches(0.55), Inches(11), Inches(0.6),
+         font_size=28, color=RGBColor(0x1A,0x1A,0x1C), bold=True, font=FONT_TITLE)
+add_text(s, '不建图、不定位——相机每一帧就是反馈', Inches(1.1), Inches(1.1), Inches(10), Inches(0.35),
+         font_size=13, color=LIGHT_GRAY)
+
+# 左半：三条控制规则
+add_text(s, '控制规则', Inches(0.8), Inches(1.65), Inches(6), Inches(0.35),
+         font_size=13, bold=True, color=LIGHT_GRAY)
+rules = [
+    ('检测框中心偏移 → 角速度 ω', '框在画面左边 → 左转；在右边 → 右转。偏移越大，转得越快。'),
+    ('检测框面积 → 前进速度 v', '框越大说明越近 → 减速；框小说明远 → 前进。面积接近阈值就停。'),
+    ('到位判定：框够大 + 够居中', '两个条件同时满足 → 停车并汇报"已到达"。'),
+]
+for i, (title, desc) in enumerate(rules):
+    ry = Inches(2.05 + i * 1.05)
+    rcard = add_card(s, Inches(0.8), ry, Inches(5.6), Inches(0.92), bg_color=CARD_BG)
+    add_accent_bar(s, Inches(0.8), ry, Inches(0.92), BG_TEAL)
+    add_text(s, title, Inches(1.05), ry + Inches(0.08), Inches(5.2), Inches(0.35),
+             font_size=13, bold=True, font=FONT_TITLE, color=BG_DEEP)
+    add_text(s, desc, Inches(1.05), ry + Inches(0.4), Inches(5.2), Inches(0.5),
+             font_size=11.5, color=RGBColor(0x1A,0x1A,0x1C))
+
+# 右半：闭环控制循环示意
+add_text(s, '闭环原理', Inches(7.0), Inches(1.65), Inches(6), Inches(0.35),
+         font_size=13, bold=True, color=LIGHT_GRAY)
+loop_nodes = ['相机检测目标', '算画面偏差', '输出 /cmd_vel', '小车移动']
+lx = Inches(7.0)
+ly = Inches(2.1)
+for i, node in enumerate(loop_nodes):
+    ny = ly + Inches(i * 0.72)
+    ncard = add_card(s, lx, ny, Inches(3.2), Inches(0.55), bg_color=NOW_BLUE)
+    add_text(s, node, lx + Inches(0.15), ny + Inches(0.08), Inches(2.9), Inches(0.4),
+             font_size=12, bold=True, color=BG_DEEP, align=PP_ALIGN.CENTER, font=FONT_TITLE)
+    # 向下箭头（最后一个不画，用弧形回到顶部——简化为文字"再检测"）
+    if i < len(loop_nodes) - 1:
+        arr = s.shapes.add_shape(MSO_SHAPE.DOWN_ARROW,
+                                 lx + Inches(1.45), ny + Inches(0.58), Inches(0.3), Inches(0.14))
+        arr.fill.solid(); arr.fill.fore_color.rgb = BG_TEAL; arr.line.fill.background()
+# 循环回顶部的弧线说明
+loop_back = add_card(s, Inches(10.4), ly + Inches(0.3), Inches(2.1), Inches(2.4),
+                     bg_color=ACCENT_SOFT, border_color=ACCENT, border_width=Pt(1))
+add_text(s, '循环', Inches(10.45), ly + Inches(0.4), Inches(2), Inches(0.35),
+         font_size=11, bold=True, color=ACCENT, align=PP_ALIGN.CENTER)
+add_text(s, '每一帧都重新检测\n不是算一次就不管了\n这就是"闭环"的意思',
+         Inches(10.5), ly + Inches(0.75), Inches(1.95), Inches(1.6),
+         font_size=11, color=RGBColor(0x1A,0x1A,0x1C), align=PP_ALIGN.CENTER)
+
+# 底部：为什么适合 + 当前状态
+bottom = add_card(s, Inches(0.8), Inches(5.3), Inches(11.7), Inches(1.7), bg_color=CARD_BG,
+                  border_color=BG_TEAL, border_width=Pt(1))
+add_accent_bar(s, Inches(0.8), Inches(5.3), Inches(1.7), BG_TEAL)
+add_text(s, '为什么适合这个项目  ·  当前进度', Inches(1.1), Inches(5.4), Inches(11), Inches(0.4),
+         font_size=14, bold=True, font=FONT_TITLE, color=BG_TEAL)
+add_text(s, '适合：不用 SLAM 地图、不用全局定位、不用 TF 树对齐；单房间找东西/跟人场景稳定；成本几乎为零。',
+         Inches(1.1), Inches(5.78), Inches(11.2), Inches(0.35),
+         font_size=11.5, color=RGBColor(0x1A,0x1A,0x1C))
+add_text(s, '待开发：目标搜索状态机（原地旋转+云台扫描）+ 伺服控制（框→/cmd_vel）+ 到位判定。'
+              '待解决：当前相机帧率仅 3~4 Hz，闭环会一顿一顿，需先诊断 HTTP MJPEG 解码瓶颈。',
+         Inches(1.1), Inches(6.15), Inches(11.2), Inches(0.75),
+         font_size=11.5, color=ACCENT, bold=True)
 
 # 认知转变 6
 insight_slide(prs, '#06', '自动化脚本写死那些容易忘的"脏活"',
