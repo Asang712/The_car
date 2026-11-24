@@ -12,6 +12,11 @@
 
 这是一套 **micro-ROS 智能小车**的完整 ROS 2 软件栈。上位机（Ubuntu 电脑）通过 micro-ROS Agent 用 UDP 与 ESP32 控制板通信，向上提供 ROS 2 话题；在此之上叠加了 SLAM / 导航 / 视觉识别跟随 / 大模型语音控制四层能力。
 
+**两种运行模式**：
+
+- **建图导航模式**（厂家默认）：SLAM 建图 → nav2 全局规划 → roadnet 路网导航，需要先建图再导航。
+- **不建图视觉伺服模式**（推荐）：用相机画面中的目标框位置/大小直接闭环控制 `/cmd_vel`，无需地图、无需全局定位。适合室内找东西、跟人、AprilTag 视觉路标等场景。`bringup_app.launch.py` 加参数 `slam_mode:=none` 即可切到此模式。
+
 核心数据链路：
 
 ```
@@ -21,7 +26,9 @@ micro-ROS Agent（电脑进程）
         ↕  ROS 2 话题（Domain ID 必须两端一致）
 ┌───────────────────────────────────────────┐
 │  感知层：/scan /imu /odom_raw /camera/image_raw │
-│  决策层：SLAM 建图 / nav2 导航 / roadnet 路网 / LLM Agent │
+│  决策层：SLAM / nav2 / roadnet（建图路线）          │
+│         视觉伺服 / YOLO / AprilTag（不建图路线）    │
+│         multi_brains LLM Agent（语音/文字理解）     │
 │  执行层：/cmd_vel /cmd_ptz_angle /beep          │
 └───────────────────────────────────────────┘
 ```
@@ -223,11 +230,12 @@ micro-ROS Agent（电脑进程）
 
 | 文件 | 作用 |
 |---|---|
-| `ros_robot_app/transmission.py` | **核心转发节点**：订阅 `/scan` 转成 `/scan_points`；订阅 `/camera/image_raw` 压缩后发布 `/camera/rgb/image_raw/compressed`，降低 App 端带宽压力 |
+| `ros_robot_app/transmission.py` | **核心转发节点**：订阅 `/scan` 转成 `/scan_points`；订阅 `/camera/image_raw`（BEST_EFFORT）压缩后发布 `/camera/rgb/image_raw/compressed`（BEST_EFFORT），降低 App 端带宽压力 |
 | `ros_robot_app/robot_pose_publisher.py` | 订阅 TF，对外发布 `PoseStamped` 形式的机器人位姿（供 App 定位显示） |
+| `ros_robot_app/odom_pose_bridge.py` | **不建图模式专用**：发布 `map→odom` 静态 TF、`odom→base_footprint` 动态 TF（来自 `/odom_raw`），并发布 `/robot_pose`。无 ros2 run 入口，需直接跑 `python3 odom_pose_bridge.py` 或由 `start_nomap.sh` 启动 |
 | `ros_robot_app/app_save_map.py` | 提供 `WebSaveMap` 服务：App 端传地图名，服务端落盘地图文件 |
 | `ros_robot_app/__init__.py` | 包标识 |
-| `setup.py` | 声明 `transmission`、`robot_pose_publisher`、`app_save_map` 三个入口 |
+| `setup.py` | 声明 `transmission`、`robot_pose_publisher`、`app_save_map` 三个入口（`odom_pose_bridge` 未注册） |
 | `setup.cfg` | 脚本安装路径 |
 | `package.xml` | 依赖 `sensor_msgs`、`nav_msgs`、`interfaces`、`cv_bridge` 等 |
 | `data/xgo.db` | 本地 SQLite 库，存放地图/任务等持久化数据 |
@@ -735,21 +743,23 @@ xxx_dify_node         → 供 multi_brains 大模型调用的版本
 
 ### 18.2 话题约定
 
-| 话题 | 类型 | 方向 | 说明 |
-|---|---|---|---|
-| `/battery` | sensor_msgs/BatteryState | 控制板 → | 电池电压 |
-| `/imu` | sensor_msgs/Imu | 控制板 → | IMU 原始数据 |
-| `/scan` | sensor_msgs/LaserScan | 控制板 → | 激光雷达 |
-| `/odom_raw` | nav_msgs/Odometry | 控制板 → | 原始里程计 |
-| `/cmd_vel` | geometry_msgs/Twist | → 控制板 | 底盘速度指令 |
-| `/beep` | std_msgs | → 控制板 | 蜂鸣器 |
-| `/cmd_ptz_angle` | geometry_msgs/Vector3 | → 控制板 | 云台目标角度 |
-| `/ptz_angle` | geometry_msgs/Vector3 | 控制板 → | 云台当前角度 |
-| `/camera/image_raw` | sensor_msgs/Image | camera_driver → | bgr8 640×480，传感器 QoS |
-| `/camera/camera_info` | sensor_msgs/CameraInfo | camera_driver → | 来自 `ost.yaml` |
-| `/tracking_bbox` | interfaces/TrackingBbox | 跟踪器 → 跟随器 | 目标框与置信度 |
-| `/scan_points` | sensor_msgs/PointCloud2 | transmission → | 雷达转点云 |
-| `/camera/rgb/image_raw/compressed` | sensor_msgs/CompressedImage | transmission → | 压缩图，供 App 拉流 |
+| 话题 | 类型 | 方向 | QoS | 说明 |
+|---|---|---|---|---|
+| `/battery` | sensor_msgs/BatteryState | 控制板 → | RELIABLE | 电池电压 |
+| `/imu` | sensor_msgs/Imu | 控制板 → | RELIABLE | IMU 原始数据 |
+| `/scan` | sensor_msgs/LaserScan | 控制板 → | RELIABLE | 激光雷达 |
+| `/odom_raw` | nav_msgs/Odometry | 控制板 → | RELIABLE | 原始里程计 |
+| `/cmd_vel` | geometry_msgs/Twist | → 控制板 | RELIABLE | 底盘速度指令 |
+| `/beep` | std_msgs | → 控制板 | RELIABLE | 蜂鸣器 |
+| `/cmd_ptz_angle` | geometry_msgs/Vector3 | → 控制板 | RELIABLE | 云台目标角度 |
+| `/ptz_angle` | geometry_msgs/Vector3 | 控制板 → | RELIABLE | 云台当前角度 |
+| `/camera/image_raw` | sensor_msgs/Image | camera_driver → | **BEST_EFFORT** | bgr8 640×480，**发布端与订阅端 QoS 必须一致**，否则话题无数据 |
+| `/camera/camera_info` | sensor_msgs/CameraInfo | camera_driver → | RELIABLE | 来自 `ost.yaml`；直跑 `camera_driver.py` 需手动传 `-p ost_file:=<绝对路径>`，launch 自动带上 |
+| `/tracking_bbox` | interfaces/TrackingBbox | 跟踪器 → 跟随器 | RELIABLE | 目标框与置信度 |
+| `/scan_points` | sensor_msgs/PointCloud2 | transmission → | BEST_EFFORT | 雷达转点云 |
+| `/camera/rgb/image_raw/compressed` | sensor_msgs/CompressedImage | transmission → | BEST_EFFORT | 压缩图，供 App 拉流；发布端/订阅端 QoS 必须匹配 |
+
+> **QoS 一致性是高频坑位**：ROS 2 话题发布端与订阅端的 `RELIABILITY` 策略必须相同，否则不会有数据传输。`camera_driver.py` 和 `transmission.py` 已统一使用 `BEST_EFFORT` 发布相机图像话题。
 
 ### 18.3 主要 action / service
 
@@ -783,44 +793,118 @@ colcon build --symlink-install --packages-up-to roadnet
 grep -E "Failed|error:" log/latest_build/events.log
 ```
 
-> `roadnet` 使用 `nav2_package()` 宏，默认开启 `-Werror`，任何弃用警告都会变成编译错误。ROS 2 Jazzy 下应使用接受 `rclcpp::QoS` 的 `create_client` / `create_service` 重载，不要传 `rmw_qos_profile_t`。
+> `roadnet` 使用 `nav2_package()` 宏，默认开启 `-Werror`，任何弃用警告都会变成编译错误。ROS 2 Jazzy 下应使用接受 `rclcpp::QoS` 的 `create_client` / `create_service` 重载，**不要传** `.get_rmw_qos_profile()` 或 `rmw_qos_profile_t`。
 
-### 19.2 典型启动顺序
+**错误写法（会触发 Jazzy 弃用警告 → -Werror 编译失败）**：
 
-```bash
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-export ROS_DOMAIN_ID=<与控制板一致>
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-
-# 1) 启动 micro-ROS Agent（工作空间外）
-ros2 run micro_ros_agent micro_ros_agent udp4 --port 8090 -v6
-
-# 2) 启动主系统（相机 + 桥接 + App 转发 [+ SLAM] [+ 导航]）
-ros2 launch microros_v2_bringup bringup_app.launch.py
-
-# 3) 路网导航（配合 roadnet）
-ros2 launch microros_v2_bringup roadnet_nav.launch.py graph:=my_graph.geojson
-
-# 4) 大模型控制
-ros2 launch multi_brains llm_agent_control.launch.py
-ros2 run multi_brains terminal_client
-
-# 5) MCP 方式接入（可选）
-ros2 run multi_brains_pre mcp_service
+```cpp
+// Jazzy 下 rmw_qos_profile_t 已被标记弃用
+auto client = node->create_client<ComputeRoute>("compute_route",
+  qos.get_rmw_qos_profile());  // ← 错误
 ```
 
-### 19.3 常见故障对照
+**正确写法**：
+
+```cpp
+// 直接传 rclcpp::QoS 对象即可
+auto client = node->create_client<ComputeRoute>("compute_route", qos);
+// 或用传感器 QoS
+auto client = node->create_client<ComputeRoute>("compute_route",
+  rclcpp::SensorDataQoS());
+```
+
+### 19.2 启动前置条件
+
+`bringup_app.launch.py` 会在启动时读取固定路径 `~/microros_ws/.system_cfg/robot_info.json`（由 `robot_tool.py` 的 `GetCameraUrl()` 调用），文件不存在会直接抛 `FileNotFoundError`。首次部署或换电脑必须先做这一步：
+
+```bash
+mkdir -p ~/microros_ws/.system_cfg
+cp /home/asang/mircoros_v2-1.0.1/mircoros_v2/.system_cfg/robot_info.json \
+   ~/microros_ws/.system_cfg/
+# 然后把 camera_ip 改成当前相机地址（手机热点 DHCP 每次重启会变）
+python3 -c "
+import json, os
+p = os.path.expanduser('~/microros_ws/.system_cfg/robot_info.json')
+d = json.load(open(p, encoding='utf-8'))
+d['camera_ip'] = '当前相机IP'  # ← 改成实际地址
+json.dump(d, open(p, 'w', encoding='utf-8'), indent=4, ensure_ascii=False)
+"
+```
+
+### 19.3 一键启动脚本（推荐）
+
+项目根目录已提供两个自动化脚本，覆盖最常用的两种操作：
+
+| 脚本 | 作用 | 用法 |
+|---|---|---|
+| `start_nomap.sh` | **一键启动不建图模式**：Agent + `bringup_app.launch.py slam_mode:=none` + `odom_pose_bridge.py`，Ctrl+C 全部退出，日志在 `~/.ros/nomap_logs/` | `./start_nomap.sh --check` 先自检，确认无误后 `./start_nomap.sh` |
+| `auto_push.sh` | 自动提交并推送到 GitHub，默认 300 秒轮询 | `./auto_push.sh --watch` 常驻，`pkill -f auto_push.sh` 停止 |
+
+> `start_nomap.sh` 会自动完成 19.2 的 `robot_info.json` 检查和复制，`auto_push.sh` 会通过 `.gitignore` 跳过 `build/`、`install/`、密钥文件。
+
+### 19.4 手动启动顺序
+
+#### 模式 A：不建图视觉伺服（推荐）
+
+```bash
+# 终端一：Agent（前台进程，关闭终端会终止）
+source /opt/ros/jazzy/setup.bash
+source ~/microros_agent_ws/install/local_setup.bash   # 按实际 Agent 工作空间路径调整
+export ROS_DOMAIN_ID=40
+ros2 run micro_ros_agent micro_ros_agent udp4 --port 8090 -v6
+
+# 终端二：主系统（相机 + rosbridge + 图传 + App 位姿桥接，**不启动任何 SLAM**）
+source /opt/ros/jazzy/setup.bash
+source /home/asang/mircoros_v2-1.0.1/mircoros_v2/install/setup.bash
+export ROS_DOMAIN_ID=40
+ros2 launch microros_v2_bringup bringup_app.launch.py \
+  slam_mode:=none navigation_mode:=False
+
+# 终端三：补位姿 TF（不建图时需要，因为 SLAM 不发布 map→odom）
+source /opt/ros/jazzy/setup.bash
+source /home/asang/mircoros_v2-1.0.1/mircoros_v2/install/setup.bash
+export ROS_DOMAIN_ID=40
+python3 /home/asang/mircoros_v2-1.0.1/mircoros_v2/src/ros_robot_app/ros_robot_app/odom_pose_bridge.py
+
+# 终端四（可选）：大模型控制
+ros2 launch multi_brains llm_agent_control.launch.py
+ros2 run multi_brains terminal_client
+```
+
+#### 模式 B：建图导航（厂家默认）
+
+```bash
+# Agent 同上，然后：
+ros2 launch microros_v2_bringup bringup_app.launch.py
+# 默认 slam_mode=slam_toolbox，会自动启动在线建图
+
+# 路网导航（额外需要先建图、再有 geojson 路网文件）
+ros2 launch microros_v2_bringup roadnet_nav.launch.py graph:=my_graph.geojson
+```
+
+### 19.5 常见故障对照
 
 | 现象 | 优先检查 |
 |---|---|
-| `ros2 topic list` 为空 | Agent 是否在跑；两端 `ROS_DOMAIN_ID` 是否一致 |
-| 控制板显示 False | Agent IP 填错、电脑防火墙、Wi-Fi 不通 |
-| 能收数据但 `/cmd_vel` 不动 | 是否还在 USB 直连模式；电池电量 |
-| 相机节点报打不开流 | 先 `ping` 相机 IP，再浏览器打开视频流地址 |
+| `bringup_app.launch.py` 启动报 `FileNotFoundError: ~/microros_ws/.system_cfg/robot_info.json` | 执行 19.2 的前置复制，或直接用 `./start_nomap.sh` |
+| `ros2 topic list` 为空 | Agent 是否在跑（前台进程不能关）；两端 `ROS_DOMAIN_ID` 是否一致 |
+| 控制板显示 False | Agent IP 填错、电脑防火墙、Wi-Fi 不通；手机热点 DHCP 重启后所有 IP 会变 |
+| 能收数据但 `/cmd_vel` 不动 | USB 是否插着（插 USB 会切到手柄模式忽略 `/cmd_vel`）；电池电压是否 ≥ 6.50 V |
+| 相机话题有发布者但 App 收不到压缩图 | 发布端/订阅端 QoS 是否一致（必须都是 BEST_EFFORT）；见 18.2 |
+| 相机节点报打不开 HTTP MJPEG 流 | 先 `ping` 相机 IP，再浏览器打开 `http://<ip>:81/stream`；热点重启后 IP 可能变化 |
+| `odom_pose_bridge.py` 启动时报重复 shutdown 警告（已修复） | 更新到最新版本，旧版 SIGTERM 处理有 bug |
+| 视觉伺服靠近时来回振荡 | 帧率偏低（3～4 Hz）会导致控制滞后；检查 HTTP MJPEG 解码瓶颈 |
 | 串口打不开 | `groups` 里是否有 `dialout` 权限 |
-| `roadnet` 编译失败 | `-Werror` 下是否有弃用 API 警告 |
+| `roadnet` 编译失败 | `-Werror` 下是否有 `rmw_qos_profile_t` 弃用警告；见 19.1 代码示例 |
+
+### 19.6 硬件约束速记
+
+- **USB 插控制板 → 手柄模式**，忽略 `/cmd_vel`；拔掉 USB 才恢复话题控制。
+- **电池 < 6.50 V → 挂起所有模块**，Wi-Fi、相机、串口全部不工作。
+- **手机热点 DHCP → 每次重启 IP 全变**（电脑、控制板、相机），需重新扫描并更新 `robot_info.json` 中的 `camera_ip`。
+- **MicroROS Agent 是前台进程**，关闭终端 = 断链，必须保持运行。
+- **ROS 2 Domain ID 必须两端一致**，不一致会导致节点互相发现失败、话题列表为空。
 
 ---
 
-*文档生成时间：2026-11-12*
+*文档生成时间：2026-11-12；最后更新：2026-11-24（补充不建图模式、启动前置条件、QoS 约定、roadnet Jazzy 修复示例、硬件约束速记、一键启动与自动推送脚本说明）*
