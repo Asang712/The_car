@@ -139,14 +139,74 @@ for i, (num, label) in enumerate([('7', '天'), ('15', '功能包'), ('11', '坑
     add_text(s, label, cx + Inches(0.3), stat_y + Inches(0.55), Inches(2.0), Inches(0.3),
              font_size=12, color=LIGHT_GRAY, font=FONT_BODY)
 
-# ===== SLIDE 2: 目录 =====
+# ===== SLIDE 2: 项目速览 =====
+s = prs.slides.add_slide(blank)
+add_bg(s, WHITE)
+add_accent_bar(s, Inches(0.8), Inches(0.7), Pt(32), BG_DEEP)
+add_text(s, '这是什么项目', Inches(1.1), Inches(0.65), Inches(11), Inches(0.5),
+         font_size=30, color=RGBColor(0x1A,0x1A,0x1C), font=FONT_TITLE, bold=True)
+add_text(s, '先搞清楚我在玩什么，再听后面的坑', Inches(1.1), Inches(1.15), Inches(10), Inches(0.35),
+         font_size=13, color=LIGHT_GRAY)
+
+# 左侧：车是什么 + 目标
+add_text(s, '一台 Yahboom micro-ROS V2 智能小车', Inches(0.8), Inches(1.65), Inches(6.5), Inches(0.45),
+         font_size=17, bold=True, font=FONT_TITLE, color=RGBColor(0x1A,0x1A,0x1C))
+add_text(s, '厂家给了 15 个 ROS 2 功能包源码，号称"开箱即用"。'
+              '搭载 ESP32 控制板 + LiDAR + 云台相机 + IMU + 麦轮底盘。'
+              '系统环境：Ubuntu 24.04 + ROS 2 Jazzy。',
+         Inches(0.8), Inches(2.15), Inches(6.5), Inches(1.2),
+         font_size=13, color=RGBColor(0x1A,0x1A,0x1C))
+
+# 目标卡片
+goal_card = add_card(s, Inches(0.8), Inches(3.5), Inches(6.5), Inches(1.5),
+                     bg_color=ACCENT_SOFT, border_color=ACCENT, border_width=Pt(1.5))
+add_text(s, '我的目标', Inches(1.0), Inches(3.6), Inches(6), Inches(0.35),
+         font_size=12, bold=True, color=ACCENT)
+add_text(s, '语音说"帮我找红色水杯" → 小车原地搜索 → 检测到目标 → '
+              '视觉伺服靠近 → 到位停下并汇报。',
+         Inches(1.0), Inches(3.95), Inches(6), Inches(1.0),
+         font_size=14, bold=True, color=RGBColor(0x1A,0x1A,0x1C), font=FONT_TITLE)
+
+# 右侧：硬件清单
+add_text(s, '硬件清单', Inches(7.8), Inches(1.65), Inches(5), Inches(0.35),
+         font_size=13, bold=True, color=LIGHT_GRAY)
+hw_list = [
+    ('ESP32', '主控板，跑 micro-ROS 固件'),
+    ('LiDAR', '激光雷达，输出 /scan'),
+    ('云台相机', 'HTTP MJPEG 流，:81 端口'),
+    ('IMU', '惯性测量单元，/imu'),
+    ('麦轮底盘', '全向移动，/cmd_vel 控制'),
+]
+for i, (name, desc) in enumerate(hw_list):
+    row_y = Inches(2.1 + i * 0.62)
+    hdot = s.shapes.add_shape(MSO_SHAPE.OVAL, Inches(7.8), row_y + Inches(0.1),
+                              Inches(0.22), Inches(0.22))
+    hdot.fill.solid(); hdot.fill.fore_color.rgb = BG_TEAL; hdot.line.fill.background()
+    add_text(s, name, Inches(8.15), row_y, Inches(1.4), Inches(0.25),
+             font_size=12, bold=True, color=BG_DEEP, font=FONT_TITLE)
+    add_text(s, desc, Inches(8.15), row_y + Inches(0.28), Inches(4.2), Inches(0.25),
+             font_size=11, color=LIGHT_GRAY)
+
+# 底部：路线选择条
+route_card = add_card(s, Inches(0.8), Inches(5.3), Inches(11.7), Inches(1.6),
+                      bg_color=NOW_BLUE, border_color=BG_DEEP, border_width=Pt(1))
+add_accent_bar(s, Inches(0.8), Inches(5.3), Inches(1.6), BG_DEEP)
+add_text(s, '路线选择：不建图，走视觉伺服', Inches(1.1), Inches(5.4), Inches(11), Inches(0.4),
+         font_size=15, bold=True, font=FONT_TITLE, color=BG_DEEP)
+add_text(s, '放弃厂家默认的 SLAM 建图 → Nav2 全局规划 → roadnet 路网路线。'
+              '改用"相机画面直接闭环控制 /cmd_vel"——框位置→角速度，框面积→前进速度。'
+              '原因：不想手动开一圈建图，室内光线条件下 SLAM 效果一般。',
+         Inches(1.1), Inches(5.8), Inches(11.2), Inches(1.0),
+         font_size=12, color=RGBColor(0x1A,0x1A,0x1C))
+
+# ===== SLIDE 3: 目录 =====
 s = prs.slides.add_slide(blank)
 add_bg(s, WHITE)
 add_accent_bar(s, Inches(1.0), Inches(0.8), Pt(32), ACCENT)
 add_text(s, '目录', Inches(1.3), Inches(0.75), Inches(10), Inches(0.5),
          font_size=32, color=RGBColor(0x1A,0x1A,0x1C), font=FONT_TITLE, bold=True)
-add_text(s, '6 个认知转变 + 1 份 checklist', Inches(1.3), Inches(1.25), Inches(10), Inches(0.4),
-         font_size=14, color=LIGHT_GRAY)
+add_text(s, '项目速览 → 系统架构 → 时间线 → 6 个认知转变 → checklist', Inches(1.3), Inches(1.25), Inches(11), Inches(0.4),
+         font_size=13, color=LIGHT_GRAY)
 
 toc_items = [
     ('01', 'QoS 是看不见的墙',  'ROS 2 话题"通了"≠"数据能传"'),
@@ -170,7 +230,69 @@ for i, (num, title, sub) in enumerate(toc_items):
     add_text(s, sub, Inches(2.2), row_y + Inches(0.35), Inches(8), Inches(0.3),
              font_size=13, color=LIGHT_GRAY)
 
-# ===== SLIDE 3: 时间线快闪 =====
+# ===== SLIDE: 系统架构数据流图 =====
+s = prs.slides.add_slide(blank)
+add_bg(s, WHITE)
+add_accent_bar(s, Inches(0.8), Inches(0.7), Pt(32), BG_TEAL)
+add_text(s, '系统架构：数据怎么流', Inches(1.1), Inches(0.65), Inches(11), Inches(0.5),
+         font_size=30, color=RGBColor(0x1A,0x1A,0x1C), font=FONT_TITLE, bold=True)
+add_text(s, '每一层都可能断链——后面的 11 个坑就是在这 5 层里逐个排出来的', Inches(1.1), Inches(1.15), Inches(11), Inches(0.35),
+         font_size=13, color=LIGHT_GRAY)
+
+# 5 个节点横向排列
+nodes = [
+    ('ESP32\n控制板', 'micro-ROS\n固件', BG_DARK, WHITE),
+    ('micro-ROS\nAgent', 'UDP :8090', BG_DEEP, WHITE),
+    ('ROS 2 话题', '/scan /odom_raw\n/cmd_vel /imu', BG_TEAL, WHITE),
+    ('板载相机', 'HTTP MJPEG\n:81 端口', BG_TEAL, WHITE),
+    ('手机 App', 'rosbridge\n:9090', ACCENT, WHITE),
+]
+node_w = Inches(2.0)
+node_h = Inches(1.2)
+start_x = Inches(0.55)
+gap = Inches(0.55)
+node_y = Inches(2.2)
+
+for i, (title, sub, bg, fg) in enumerate(nodes):
+    nx = start_x + i * (node_w + gap)
+    card = add_card(s, nx, node_y, node_w, node_h, bg_color=bg)
+    add_text(s, title, nx + Inches(0.1), node_y + Inches(0.15), node_w - Inches(0.2), Inches(0.7),
+             font_size=13, bold=True, color=fg, font=FONT_TITLE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    add_text(s, sub, nx + Inches(0.1), node_y + Inches(0.75), node_w - Inches(0.2), Inches(0.4),
+             font_size=10, color=fg, align=PP_ALIGN.CENTER)
+    # 箭头（最后一个不加）
+    if i < len(nodes) - 1:
+        arrow = s.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW,
+                                   nx + node_w + Inches(0.05), node_y + Inches(0.45),
+                                   gap - Inches(0.1), Inches(0.3))
+        arrow.fill.solid(); arrow.fill.fore_color.rgb = LIGHT_GRAY; arrow.line.fill.background()
+
+# 下方数据流注释行
+flow_labels = [
+    '硬件层\n电池/USB 模式',
+    '传输层\nUDP 点对点',
+    '通信层\nQoS 必须匹配',
+    '感知层\nHTTP 解码帧率',
+    '应用层\nWebSocket',
+]
+for i, label in enumerate(flow_labels):
+    nx = start_x + i * (node_w + gap)
+    add_text(s, label, nx, node_y + node_h + Inches(0.25), node_w, Inches(0.7),
+             font_size=10.5, color=LIGHT_GRAY, align=PP_ALIGN.CENTER, bold=False)
+
+# 底部 insight 框
+insight_card = add_card(s, Inches(0.8), Inches(5.2), Inches(11.7), Inches(1.6),
+                        bg_color=CARD_BG, border_color=BG_TEAL, border_width=Pt(1))
+add_accent_bar(s, Inches(0.8), Inches(5.2), Inches(1.6), BG_TEAL)
+add_text(s, '一句话看懂这套架构', Inches(1.1), Inches(5.3), Inches(11), Inches(0.4),
+         font_size=14, bold=True, font=FONT_TITLE, color=BG_TEAL)
+add_text(s, 'ESP32 采集传感器数据 → Agent 转成 ROS 2 话题 → 电脑上跑各种算法节点订阅发布 → '
+              '相机走独立 HTTP 流 → 压缩后通过 rosbridge 推到手机 App。'
+              '这 5 层任何一层出问题，整条链都会断。',
+         Inches(1.1), Inches(5.7), Inches(11.2), Inches(1.0),
+         font_size=12, color=RGBColor(0x1A,0x1A,0x1C))
+
+# ===== SLIDE: 时间线快闪 =====
 s = prs.slides.add_slide(blank)
 add_bg(s, WHITE)
 add_accent_bar(s, Inches(0.8), Inches(0.7), Pt(32), BG_DEEP)
